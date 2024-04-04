@@ -56,15 +56,16 @@ class NoiseScheduler():
                  num_timesteps=1000,
                  beta_start=0.0001,
                  beta_end=0.02,
-                 beta_schedule="linear"):
+                 beta_schedule="linear",
+                 device=None):
 
         self.num_timesteps = num_timesteps
         if beta_schedule == "linear":
             self.betas = torch.linspace(
-                beta_start, beta_end, num_timesteps, dtype=torch.float32)
+                beta_start, beta_end, num_timesteps, dtype=torch.float32, device=device)
         elif beta_schedule == "quadratic":
             self.betas = torch.linspace(
-                beta_start ** 0.5, beta_end ** 0.5, num_timesteps, dtype=torch.float32) ** 2
+                beta_start ** 0.5, beta_end ** 0.5, num_timesteps, dtype=torch.float32, device=device) ** 2
 
         self.alphas = 1.0 - self.betas
         self.alphas_cumprod = torch.cumprod(self.alphas, axis=0)
@@ -149,23 +150,31 @@ if __name__ == "__main__":
     parser.add_argument("--hidden_layers", type=int, default=3)
     parser.add_argument("--time_embedding", type=str, default="sinusoidal", choices=["sinusoidal", "learnable", "linear", "zero"])
     parser.add_argument("--input_embedding", type=str, default="sinusoidal", choices=["sinusoidal", "learnable", "linear", "identity"])
-    parser.add_argument("--save_images_step", type=int, default=1)
+    parser.add_argument("--save_images_step", type=int, default=50)
     config = parser.parse_args()
 
     dataset = datasets.get_dataset(config.dataset)
     dataloader = DataLoader(
         dataset, batch_size=config.train_batch_size, shuffle=True, drop_last=True)
 
+    device = 'cpu'
+    # if torch.backends.mps.is_available():
+    #     device = 'mps'
+
     model = MLP(
         hidden_size=config.hidden_size,
         hidden_layers=config.hidden_layers,
         emb_size=config.embedding_size,
         time_emb=config.time_embedding,
-        input_emb=config.input_embedding)
+        input_emb=config.input_embedding
+    )
+    model = model.to(device)
 
     noise_scheduler = NoiseScheduler(
         num_timesteps=config.num_timesteps,
-        beta_schedule=config.beta_schedule)
+        beta_schedule=config.beta_schedule,
+        device=device,
+    )
 
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -181,10 +190,11 @@ if __name__ == "__main__":
         progress_bar = tqdm(total=len(dataloader))
         progress_bar.set_description(f"Epoch {epoch}")
         for step, batch in enumerate(dataloader):
-            batch = batch[0]
-            noise = torch.randn(batch.shape)
+            batch = batch[0].to(device)
+            noise = torch.randn(batch.shape, device=device)
             timesteps = torch.randint(
-                0, noise_scheduler.num_timesteps, (batch.shape[0],)
+                0, noise_scheduler.num_timesteps, (batch.shape[0],),
+                device=device,
             ).long()
 
             noisy = noise_scheduler.add_noise(batch, noise, timesteps)
@@ -206,14 +216,14 @@ if __name__ == "__main__":
         if epoch % config.save_images_step == 0 or epoch == config.num_epochs - 1:
             # generate data with the model to later visualize the learning process
             model.eval()
-            sample = torch.randn(config.eval_batch_size, 2)
+            sample = torch.randn(config.eval_batch_size, 2, device=device)
             timesteps = list(range(len(noise_scheduler)))[::-1]
             for i, t in enumerate(tqdm(timesteps)):
-                t = torch.from_numpy(np.repeat(t, config.eval_batch_size)).long()
+                t = torch.from_numpy(np.repeat(t, config.eval_batch_size)).long().to(device)
                 with torch.no_grad():
                     residual = model(sample, t)
                 sample = noise_scheduler.step(residual, t[0], sample)
-            frames.append(sample.numpy())
+            frames.append(sample.cpu().numpy())
 
     print("Saving model...")
     outdir = f"exps/{config.experiment_name}"
