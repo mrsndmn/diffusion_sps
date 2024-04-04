@@ -1,5 +1,6 @@
 import argparse
 import os
+import signal
 
 import torch
 from torch import nn
@@ -23,7 +24,6 @@ class Block(nn.Module):
 
     def forward(self, x: torch.Tensor):
         return x + self.act(self.ff(x))
-
 
 class MLP(nn.Module):
     def __init__(self, hidden_size: int = 128, hidden_layers: int = 3, emb_size: int = 128,
@@ -49,6 +49,34 @@ class MLP(nn.Module):
         x = torch.cat((x1_emb, x2_emb, t_emb), dim=-1)
         x = self.joint_mlp(x)
         return x
+
+
+class MLPSPS(nn.Module):
+    def __init__(self, hidden_size: int = 128, hidden_layers: int = 3, emb_size: int = 128,
+                 time_emb: str = "sinusoidal", input_emb: str = "sinusoidal", num_timesteps=50):
+        super().__init__()
+
+        mlps_for_timesteps = []
+        for i in range(num_timesteps):
+            mlp = MLP(
+                hidden_size=hidden_size,
+                hidden_layers=hidden_layers,
+                emb_size=emb_size,
+                time_emb=time_emb,
+                input_emb=input_emb,
+            )
+            mlps_for_timesteps.append(mlp)
+
+        self.mlp_sps = nn.ModuleList(mlps_for_timesteps)
+
+    def forward(self, x, t):
+        prediction = []
+        # print("self.mlp_sps", len(self.mlp_sps), "timesteps", t)
+        for i in range(t.shape[0]):
+            t_i = t[i]
+            prediction.append(self.mlp_sps[t_i](x[i:i+1], t[i:i+1]))
+
+        return torch.vstack(prediction)
 
 
 class NoiseScheduler():
@@ -134,6 +162,14 @@ class NoiseScheduler():
     def __len__(self):
         return self.num_timesteps
 
+class GracefulKiller:
+  kill_now = False
+  def __init__(self):
+    signal.signal(signal.SIGINT, self.exit_gracefully)
+    signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+  def exit_gracefully(self, signum, frame):
+    self.kill_now = True
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -150,8 +186,11 @@ if __name__ == "__main__":
     parser.add_argument("--hidden_layers", type=int, default=3)
     parser.add_argument("--time_embedding", type=str, default="sinusoidal", choices=["sinusoidal", "learnable", "linear", "zero"])
     parser.add_argument("--input_embedding", type=str, default="sinusoidal", choices=["sinusoidal", "learnable", "linear", "identity"])
-    parser.add_argument("--save_images_step", type=int, default=50)
+    parser.add_argument("--save_images_step", type=int, default=1)
+    parser.add_argument("--model_type", type=str, default="mlp", choices=["mlp", "mlp_sps"])
     config = parser.parse_args()
+
+    outdir = f"exps/{config.experiment_name}"
 
     dataset = datasets.get_dataset(config.dataset)
     dataloader = DataLoader(
@@ -161,13 +200,24 @@ if __name__ == "__main__":
     # if torch.backends.mps.is_available():
     #     device = 'mps'
 
-    model = MLP(
-        hidden_size=config.hidden_size,
-        hidden_layers=config.hidden_layers,
-        emb_size=config.embedding_size,
-        time_emb=config.time_embedding,
-        input_emb=config.input_embedding
-    )
+    if config.model_type == 'mlp':
+        model = MLP(
+            hidden_size=config.hidden_size,
+            hidden_layers=config.hidden_layers,
+            emb_size=config.embedding_size,
+            time_emb=config.time_embedding,
+            input_emb=config.input_embedding
+        )
+    elif config.model_type == 'mlp_sps':
+        model = MLPSPS(
+            hidden_size=config.hidden_size,
+            hidden_layers=config.hidden_layers,
+            emb_size=config.embedding_size,
+            time_emb=config.time_embedding,
+            input_emb=config.input_embedding,
+            num_timesteps=config.num_timesteps,
+        )
+
     model = model.to(device)
 
     noise_scheduler = NoiseScheduler(
@@ -181,15 +231,23 @@ if __name__ == "__main__":
         lr=config.learning_rate,
     )
 
+    killer = GracefulKiller()
+
     global_step = 0
     frames = []
     losses = []
     print("Training model...")
     for epoch in range(config.num_epochs):
+        if killer.kill_now:
+            break
+
         model.train()
         progress_bar = tqdm(total=len(dataloader))
         progress_bar.set_description(f"Epoch {epoch}")
         for step, batch in enumerate(dataloader):
+            if killer.kill_now:
+                break
+
             batch = batch[0].to(device)
             noise = torch.randn(batch.shape, device=device)
             timesteps = torch.randint(
@@ -219,33 +277,41 @@ if __name__ == "__main__":
             sample = torch.randn(config.eval_batch_size, 2, device=device)
             timesteps = list(range(len(noise_scheduler)))[::-1]
             for i, t in enumerate(tqdm(timesteps)):
+                if killer.kill_now:
+                    break
+
                 t = torch.from_numpy(np.repeat(t, config.eval_batch_size)).long().to(device)
                 with torch.no_grad():
                     residual = model(sample, t)
                 sample = noise_scheduler.step(residual, t[0], sample)
             frames.append(sample.cpu().numpy())
 
+            imgdir = f"{outdir}/images"
+            os.makedirs(imgdir, exist_ok=True)
+            xmin, xmax = -6, 6
+            ymin, ymax = -6, 6
+            for i, frame in enumerate(frames):
+                plt.figure(figsize=(10, 10))
+                plt.scatter(frame[:, 0], frame[:, 1])
+                plt.xlim(xmin, xmax)
+                plt.ylim(ymin, ymax)
+                plt.savefig(f"{imgdir}/{i:04}.png")
+                plt.title(f"Epoch {epoch}")
+                plt.close()
+
+
     print("Saving model...")
-    outdir = f"exps/{config.experiment_name}"
     os.makedirs(outdir, exist_ok=True)
     torch.save(model.state_dict(), f"{outdir}/model.pth")
 
-    print("Saving images...")
-    imgdir = f"{outdir}/images"
-    os.makedirs(imgdir, exist_ok=True)
-    frames = np.stack(frames)
-    xmin, xmax = -6, 6
-    ymin, ymax = -6, 6
-    for i, frame in enumerate(frames):
-        plt.figure(figsize=(10, 10))
-        plt.scatter(frame[:, 0], frame[:, 1])
-        plt.xlim(xmin, xmax)
-        plt.ylim(ymin, ymax)
-        plt.savefig(f"{imgdir}/{i:04}.png")
-        plt.close()
-
     print("Saving loss as numpy array...")
     np.save(f"{outdir}/loss.npy", np.array(losses))
+    plt.figure(figsize=(10, 10))
+    plt.plot(losses)
+    plt.title("Loss")
+    plt.savefig(f"{outdir}/loss.png")
+    plt.close()
 
     print("Saving frames...")
+    frames = np.stack(frames)
     np.save(f"{outdir}/frames.npy", frames)
