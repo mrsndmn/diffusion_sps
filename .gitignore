@@ -1,3 +1,7 @@
-*
+.mypy_cache
+.pytest_cache
+.cache
+exps/
+.dmypy.json
 !.gitignore
 __pycache__

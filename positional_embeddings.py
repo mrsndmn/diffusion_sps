@@ -1,5 +1,7 @@
 '''Different methods for positional embeddings. These are not essential for understanding DDPMs, but are relevant for the ablation study.'''
 
+from typing import Union
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -73,9 +75,12 @@ class ZeroEmbedding(nn.Module):
         return 1
 
 
+
 class PositionalEmbedding(nn.Module):
     def __init__(self, size: int, type: str, **kwargs):
         super().__init__()
+
+        self.layer: Union[SinusoidalEmbedding | LinearEmbedding | LearnableEmbedding | ZeroEmbedding | IdentityEmbedding]
 
         if type == "sinusoidal":
             self.layer = SinusoidalEmbedding(size, **kwargs)

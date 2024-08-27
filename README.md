@@ -1,3 +1,11 @@
+# sps diffusion
+
+
+Sps diffusion training from scratch cmd
+```
+~/miniconda3/envs/diffusion_sps/bin/python ./ddpm.py --model_type mlp_sps --experiment_name mlp_sps_cpu --save_images_step 10 --device cpu --num_timesteps 10 --num_epochs 250
+```
+
 # tiny-diffusion
 
 A minimal PyTorch implementation of probabilistic diffusion models for 2D datasets. Get started by running `python ddpm.py -h` to explore the available options for training.
