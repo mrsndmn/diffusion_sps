@@ -9,7 +9,6 @@ import os
 class ModelTypeEnum(str, Enum):
     mlp         = "mlp"
     mlp_sps     = "mlp_sps"
-    mlp_blocked = "mlp_blocked"
 
 class DatasetEnum(str, Enum):
     circle  = "circle"
@@ -43,7 +42,7 @@ class TimeEmbeddingEnum(str, Enum):
 class ExperimentConfig(BaseModel):
     experiment_name: str
     dataset: DatasetEnum
-    model_type: ModelTypeEnum
+    nn_model_type: ModelTypeEnum
 
     # training params
     num_epochs: int
@@ -71,12 +70,12 @@ class ExperimentConfig(BaseModel):
 
     @computed_field
     def imgdir(self) -> str:
-        return os.path.join(self.outdir(), "images")
+        return os.path.join(self.outdir, "images") # type: ignore
 
     @model_validator(mode='after')
     def runtime_after_validator(self: Self) -> Self:
 
-        if self.model_type != ModelTypeEnum.mlp_sps and self.sps_checkpoint is not None:
-            raise ValueError("`sps_checkpoint` can be used only with model_type=mlp_sps")
+        if self.nn_model_type != ModelTypeEnum.mlp_sps and self.sps_checkpoint is not None:
+            raise ValueError("`sps_checkpoint` can be used only with nn_model_type=mlp_sps")
 
         return self

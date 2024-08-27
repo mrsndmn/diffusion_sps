@@ -33,7 +33,7 @@ class MLP(nn.Module):
         layers.append(nn.Linear(hidden_size, 2))
         self.joint_mlp = nn.Sequential(*layers)
 
-    def forward(self, x, t):
+    def forward(self, x: torch.Tensor, t):
         x1_emb = self.input_mlp1(x[:, 0])
         x2_emb = self.input_mlp2(x[:, 1])
         t_emb = self.time_mlp(t)
@@ -77,6 +77,11 @@ class MLPSPS(nn.Module):
 
         return torch.vstack(prediction)
 
+    def forward_single_timestep(self, x, t):
+        predictions = self.mlp_sps[t[0]](x, t)
+        return predictions
+
+
 
 AnyModel = Union[MLP, MLPSPS]
 
@@ -84,7 +89,7 @@ def get_model(config: ExperimentConfig):
 
     model: Union[MLP | MLPSPS]
 
-    if config.model_type == 'mlp':
+    if config.nn_model_type == 'mlp':
         model = MLP(
             hidden_size=config.hidden_size,
             hidden_layers=config.hidden_layers,
@@ -92,7 +97,7 @@ def get_model(config: ExperimentConfig):
             time_emb=config.time_embedding,
             input_emb=config.input_embedding
         )
-    elif config.model_type == 'mlp_sps':
+    elif config.nn_model_type == 'mlp_sps':
         model = MLPSPS(
             hidden_size=config.hidden_size,
             hidden_layers=config.hidden_layers,
@@ -104,6 +109,6 @@ def get_model(config: ExperimentConfig):
         if config.sps_checkpoint is not None:
             model.init_from_checkpoint_weights(config.sps_checkpoint)
     else:
-        raise ValueError(f"unsupported model_type {config.model_type}")
+        raise ValueError(f"unsupported nn_model_type {config.nn_model_type}")
 
     return model

@@ -2,6 +2,8 @@ import argparse
 import os
 import signal
 
+import random
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -19,7 +21,7 @@ from pydantic_core import from_json
 
 # local imports
 from noise_scheduler import NoiseScheduler
-from config import ExperimentConfig, DeviceEnum
+from config import ExperimentConfig, DeviceEnum, ModelTypeEnum
 from model import get_model, MLP, MLPSPS, AnyModel
 
 class GracefulKiller:
@@ -31,18 +33,26 @@ class GracefulKiller:
   def exit_gracefully(self, signum, frame):
     self.kill_now = True
 
-def train_iteration(experiment_config: ExperimentConfig, model: AnyModel, optimizer, device: DeviceEnum):
+def train_iteration(experiment_config: ExperimentConfig, model: AnyModel, optimizer, batch, device: DeviceEnum):
     batch = batch[0].to(device)
     noise = torch.randn(batch.shape, device=device)
 
-    timesteps = torch.randint(
-        0, noise_scheduler.num_timesteps, (batch.shape[0],),
-        device=device,
-    ).long()
+    if experiment_config.nn_model_type == ModelTypeEnum.mlp_sps:
+        timesteps = torch.full([ batch.shape[0] ], random.randint(0, noise_scheduler.num_timesteps - 1))
+    else:
+        timesteps = torch.randint(
+            0, noise_scheduler.num_timesteps, (batch.shape[0],),
+            device=device,
+        ).long()
 
     noisy = noise_scheduler.add_noise(batch, noise, timesteps)
 
-    noise_pred = model(noisy, timesteps)
+    if experiment_config.nn_model_type == ModelTypeEnum.mlp_sps:
+        # model: MLPSPS
+        noise_pred = model.forward_single_timestep(noisy, timesteps)
+    else:
+        noise_pred = model(noisy, timesteps)
+
     loss = F.mse_loss(noise_pred, noise)
     loss.backward(loss)
 
@@ -57,19 +67,19 @@ def train_iteration(experiment_config: ExperimentConfig, model: AnyModel, optimi
 def eval_iteration(experiment_config: ExperimentConfig, model: AnyModel, device: DeviceEnum):
 
     model.eval()
-    sample = torch.randn(config.eval_batch_size, 2, device=device)
+    sample = torch.randn(experiment_config.eval_batch_size, 2, device=device)
     timesteps = torch.tensor(list(range(len(noise_scheduler)))[::-1], dtype=torch.long)
     for i, t in enumerate(tqdm(timesteps)):
         if killer.kill_now:
             break
 
-        t = torch.from_numpy(np.repeat(t, config.eval_batch_size)).long().to(device)
+        full_timesteps = torch.full([experiment_config.eval_batch_size], t).long().to(device)
         with torch.no_grad():
-            residual = model(sample, t)
-        sample = noise_scheduler.step(residual, t[0], sample)
+            residual = model(sample, full_timesteps)
+        sample = noise_scheduler.step(residual, t, sample)
     sample_npy = sample.cpu().numpy()
 
-    imgdir = experiment_config.imgdir()
+    imgdir: str = experiment_config.imgdir # type: ignore
     os.makedirs(imgdir, exist_ok=True)
 
     xmin, xmax = -6, 6
@@ -90,38 +100,41 @@ def eval_iteration(experiment_config: ExperimentConfig, model: AnyModel, device:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str)
-    config = parser.parse_args()
+    arguments = config = parser.parse_args()
 
-    experiment_config = ExperimentConfig.model_validate_json(from_json(config.config))
+    with open(arguments.config, 'r') as f:
+        config_json_data = f.read()
 
-    dataset = datasets.get_dataset(config.dataset)
+    experiment_config = ExperimentConfig.model_validate_json(config_json_data)
+
+    dataset = datasets.get_dataset(experiment_config.dataset)
     dataloader = DataLoader(
-        dataset, batch_size=config.train_batch_size, shuffle=True, drop_last=True
+        dataset, batch_size=experiment_config.train_batch_size, shuffle=True, drop_last=True
     )
 
-    if config.device == 'auto':
+    if experiment_config.device == 'auto':
         device = DeviceEnum.cpu
         if torch.backends.mps.is_available():
             device = DeviceEnum.mps
         elif torch.cuda.is_available():
             device = DeviceEnum.cuda
     else:
-        device = config.device
+        device = experiment_config.device
 
     model = get_model(experiment_config)
     model = model.to(device)
 
-    outdir = experiment_config.outdir()
+    outdir: str = experiment_config.outdir # type: ignore
 
     noise_scheduler = NoiseScheduler(
-        num_timesteps=config.num_timesteps,
-        beta_schedule=config.beta_schedule,
+        num_timesteps=experiment_config.num_timesteps,
+        beta_schedule=experiment_config.beta_schedule,
         device=device,
     )
 
     optimizer = torch.optim.AdamW(
         model.parameters(),
-        lr=config.learning_rate,
+        lr=experiment_config.learning_rate,
     )
 
     killer = GracefulKiller()
@@ -130,7 +143,7 @@ if __name__ == "__main__":
     frames = []
     losses = []
     print("Training model...")
-    for epoch in range(config.num_epochs):
+    for epoch in range(experiment_config.num_epochs):
         if killer.kill_now:
             break
 
@@ -141,7 +154,7 @@ if __name__ == "__main__":
             if killer.kill_now:
                 break
 
-            loss = train_iteration(experiment_config, model, optimizer, device=device)
+            loss = train_iteration(experiment_config, model, optimizer, batch, device=device)
 
             progress_bar.update(1)
             logs = {"loss": loss.detach().item(), "step": global_step}
@@ -150,7 +163,7 @@ if __name__ == "__main__":
             global_step += 1
         progress_bar.close()
 
-        if epoch % config.save_images_step == 0 or epoch == config.num_epochs - 1:
+        if epoch % experiment_config.save_images_step == 0 or epoch == experiment_config.num_epochs - 1:
             # generate data with the model to later visualize the learning process
             frame = eval_iteration(experiment_config, model, device=device)
             frames.append(frame)

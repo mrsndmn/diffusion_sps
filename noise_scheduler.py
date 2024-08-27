@@ -1,4 +1,5 @@
 import torch
+from torch.nn import functional as F
 
 class NoiseScheduler():
     def __init__(self,
