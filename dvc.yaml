@@ -1,17 +1,17 @@
 stages:
   train_mlp:
-    cmd: PYTHONPATH=. python ddpm.py --config configs/mlp.json
+    cmd: PYTHONPATH=. python ddpm.py --config configs/sps/mlp.json
     deps:
     - static
-    - configs/mlp.json # todo move to param
+    - configs/sps/mlp.json # todo move to param
   train_mlp_sps_from_scratch:
-    cmd: PYTHONPATH=. python ddpm.py --config configs/mlp_sps_from_scratch.json
+    cmd: PYTHONPATH=. python ddpm.py --config configs/sps/mlp_sps_from_scratch.json
     deps:
     - static
-    - configs/mlp_sps_from_scratch.json # todo move to param
+    - configs/sps/mlp_sps_from_scratch.json # todo move to param
   train_mlp_sps_from_pretrained:
-    cmd: PYTHONPATH=. python ddpm.py --config configs/mlp_sps_from_pretrained.json
+    cmd: PYTHONPATH=. python ddpm.py --config configs/sps/mlp_sps_from_pretrained.json
     deps:
     - static
-    - configs/mlp_sps_from_pretrained.json # todo move to param
+    - configs/sps/mlp_sps_from_pretrained.json # todo move to param
     - exps/mlp/model.pth # todo move to params and to config template
