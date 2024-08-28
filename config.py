@@ -1,6 +1,7 @@
 from typing import Optional
 from typing_extensions import Self
 
+import torch
 from pydantic import BaseModel, model_validator, computed_field
 from enum import Enum
 
@@ -71,6 +72,20 @@ class ExperimentConfig(BaseModel):
     @computed_field
     def imgdir(self) -> str:
         return os.path.join(self.outdir, "images") # type: ignore
+
+    @computed_field
+    def nn_device(self) -> DeviceEnum:
+        if self.device == 'auto':
+            device = DeviceEnum.cpu
+            if torch.backends.mps.is_available():
+                device = DeviceEnum.mps
+            elif torch.cuda.is_available():
+                device = DeviceEnum.cuda
+        else:
+            device = self.device
+
+        return device
+
 
     @model_validator(mode='after')
     def runtime_after_validator(self: Self) -> Self:

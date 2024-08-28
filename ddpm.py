@@ -114,15 +114,7 @@ if __name__ == "__main__":
         dataset, batch_size=experiment_config.train_batch_size, shuffle=True, drop_last=True
     )
 
-    if experiment_config.device == 'auto':
-        device = DeviceEnum.cpu
-        if torch.backends.mps.is_available():
-            device = DeviceEnum.mps
-        elif torch.cuda.is_available():
-            device = DeviceEnum.cuda
-    else:
-        device = experiment_config.device
-
+    device: DeviceEnum = experiment_config.nn_device # type: ignore
     model = get_model(experiment_config)
     model = model.to(device)
 
