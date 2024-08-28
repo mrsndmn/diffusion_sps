@@ -5,7 +5,7 @@
     "dataset": "dino",
     "train_batch_size": 200,
     "eval_batch_size": 1000,
-    "num_epochs": 750,
+    "num_epochs": 2500,
     "sps_checkpoint": null,
     "learning_rate": 0.001,
     "num_timesteps": 50,
@@ -14,6 +14,6 @@
     "hidden_size": 128,
     "time_embedding": "sinusoidal",
     "input_embedding": "sinusoidal",
-    "save_images_step": 50,
+    "save_images_step": 500,
     "device": "cpu"
 }

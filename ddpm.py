@@ -1,7 +1,7 @@
 import argparse
 import os
 import signal
-
+from typing import Dict, List
 import random
 
 import torch
@@ -23,6 +23,7 @@ from pydantic_core import from_json
 from noise_scheduler import NoiseScheduler
 from config import ExperimentConfig, DeviceEnum, ModelTypeEnum
 from model import get_model, MLP, MLPSPS, AnyModel
+from metric import metric_nearest_distance
 
 class GracefulKiller:
   kill_now = False
@@ -108,6 +109,7 @@ if __name__ == "__main__":
     experiment_config = ExperimentConfig.model_validate_json(config_json_data)
 
     dataset = datasets.get_dataset(experiment_config.dataset)
+    dataset_frame_numpy: np.ndarray = np.vstack([ t.numpy() for t in dataset.tensors ])
     dataloader = DataLoader(
         dataset, batch_size=experiment_config.train_batch_size, shuffle=True, drop_last=True
     )
@@ -142,6 +144,10 @@ if __name__ == "__main__":
     global_step = 0
     frames = []
     losses = []
+    metric_max = []
+    metric_sum = []
+    metric_mean = []
+
     print("Training model...")
     for epoch in range(experiment_config.num_epochs):
         if killer.kill_now:
@@ -168,17 +174,48 @@ if __name__ == "__main__":
             frame = eval_iteration(experiment_config, model, device=device)
             frames.append(frame)
 
+            metrics_value = metric_nearest_distance(frame, dataset_frame_numpy)
+            metric_max.append(metrics_value.value_max)
+            metric_sum.append(metrics_value.value_sum)
+            metric_mean.append(metrics_value.value_mean)
+
     print("Saving model...")
     os.makedirs(outdir, exist_ok=True)
     torch.save(model.state_dict(), f"{outdir}/model.pth")
+
+    experiment_name = experiment_config.experiment_name
 
     print("Saving loss as numpy array...")
     np.save(f"{outdir}/loss.npy", np.array(losses))
     plt.figure(figsize=(10, 10))
     plt.plot(losses)
-    plt.title("Loss")
+    plt.title(f"[{experiment_name}] Loss")
     plt.savefig(f"{outdir}/loss.png")
     plt.close()
+
+    np.save(f"{outdir}/loss.npy", np.array(losses))
+    plt.figure(figsize=(10, 10))
+    plt.plot(losses)
+    plt.title(f"[{experiment_name}] Loss")
+    plt.savefig(f"{outdir}/loss.png")
+    plt.close()
+
+    print("Saving metrics")
+    metrics_named: Dict[str, List[float]] = {
+        "metric_max": metric_max,
+        "metric_sum": metric_sum,
+        "metric_mean": metric_mean,
+    }
+    for metric_name, metric_values in metrics_named.items():
+        metric_path = os.path.join(experiment_config.outdir, metric_name + ".npy") # type: ignore
+        np.save(metric_path, np.array(metric_values))
+
+        metric_image_path = os.path.join(experiment_config.outdir, metric_name + ".png") # type: ignore
+        plt.figure(figsize=(10, 10))
+        plt.plot(metric_values)
+        plt.title(f"[{experiment_name}] {metric_name}")
+        plt.savefig(metric_image_path)
+        plt.close()
 
     print("Saving frames...")
     frames = np.stack(frames)

@@ -1,0 +1,42 @@
+schema: '2.0'
+stages:
+  train_mlp:
+    cmd: PYTHONPATH=. python ddpm.py --config configs/mlp.json
+    deps:
+    - path: configs/mlp.json
+      hash: md5
+      md5: e0b1ff3b3ae3d771fc326c295bd9157d
+      size: 472
+    - path: static
+      hash: md5
+      md5: 16e7c010d8f5c1a4289441553cf423ff.dir
+      size: 64046
+      nfiles: 1
+  train_mlp_sps_from_scratch:
+    cmd: PYTHONPATH=. python ddpm.py --config configs/mlp_sps_from_scratch.json
+    deps:
+    - path: configs/mlp_sps_from_scratch.json
+      hash: md5
+      md5: 5fa4106d0b82ff0b55e83556a3cdcd15
+      size: 496
+    - path: static
+      hash: md5
+      md5: 16e7c010d8f5c1a4289441553cf423ff.dir
+      size: 64046
+      nfiles: 1
+  train_mlp_sps_from_pretrained:
+    cmd: PYTHONPATH=. python ddpm.py --config configs/mlp_sps_from_pretrained.json
+    deps:
+    - path: configs/mlp_sps_from_pretrained.json
+      hash: md5
+      md5: 3504d5de3a0b7b6611f3faa115961c49
+      size: 513
+    - path: exps/mlp/model.pth
+      hash: md5
+      md5: 899cd8a1c97d6f5661b2da4e12f90c13
+      size: 399836
+    - path: static
+      hash: md5
+      md5: 16e7c010d8f5c1a4289441553cf423ff.dir
+      size: 64046
+      nfiles: 1
