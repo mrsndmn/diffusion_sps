@@ -94,3 +94,19 @@ class ExperimentConfig(BaseModel):
             raise ValueError("`sps_checkpoint` can be used only with nn_model_type=mlp_sps")
 
         return self
+
+class ProgressiveDistillationExperimentConfig(ExperimentConfig):
+    distillation_steps: int # сколько раз будет уменьшаться количество таймстепов?
+    teacher_checkpoint: str
+
+    @model_validator(mode='after')
+    def runtime_after_validate_progressive_distillation(self: Self) -> Self:
+        max_divider: int = 2**self.distillation_steps
+        if self.num_timesteps % max_divider != 0:
+            raise ValueError("`num_timesteps` must be dividable by `distillation_steps*distillation_factor`")
+
+        if self.num_timesteps < max_divider:
+            raise ValueError("`num_timesteps` must be less than `distillation_steps*distillation_factor`")
+
+        return self
+

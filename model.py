@@ -78,6 +78,8 @@ class MLPSPS(nn.Module):
         return torch.vstack(prediction)
 
     def forward_single_timestep(self, x, t):
+        assert (t == t[0]).all(), 'all values of t is expected to be equal'
+
         predictions = self.mlp_sps[t[0]](x, t)
         return predictions
 

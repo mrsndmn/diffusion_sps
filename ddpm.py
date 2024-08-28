@@ -20,19 +20,11 @@ from torch.profiler import profile, record_function, ProfilerActivity
 from pydantic_core import from_json
 
 # local imports
+from training import GracefulKiller
 from noise_scheduler import NoiseScheduler
 from config import ExperimentConfig, DeviceEnum, ModelTypeEnum
 from model import get_model, MLP, MLPSPS, AnyModel
 from metric import metric_nearest_distance
-
-class GracefulKiller:
-  kill_now = False
-  def __init__(self):
-    signal.signal(signal.SIGINT, self.exit_gracefully)
-    signal.signal(signal.SIGTERM, self.exit_gracefully)
-
-  def exit_gracefully(self, signum, frame):
-    self.kill_now = True
 
 def train_iteration(experiment_config: ExperimentConfig, model: AnyModel, optimizer, batch, device: DeviceEnum):
     batch = batch[0].to(device)
@@ -65,19 +57,17 @@ def train_iteration(experiment_config: ExperimentConfig, model: AnyModel, optimi
     return loss
 
 
-def eval_iteration(experiment_config: ExperimentConfig, model: AnyModel, device: DeviceEnum):
+def eval_iteration(experiment_config: ExperimentConfig, model: AnyModel, noise_scheduler: NoiseScheduler, device: DeviceEnum, epoch=0, prefix=''):
 
     model.eval()
     sample = torch.randn(experiment_config.eval_batch_size, 2, device=device)
-    timesteps = torch.tensor(list(range(len(noise_scheduler)))[::-1], dtype=torch.long)
-    for i, t in enumerate(tqdm(timesteps)):
-        if killer.kill_now:
-            break
+    timesteps_reversed = noise_scheduler.prepare_timesteps_for_sampling()
+    for i, t in enumerate(tqdm(timesteps_reversed)):
 
         full_timesteps = torch.full([experiment_config.eval_batch_size], t).long().to(device)
         with torch.no_grad():
             residual = model(sample, full_timesteps)
-        sample = noise_scheduler.step(residual, t, sample)
+        sample = noise_scheduler.step(residual, full_timesteps, sample)
     sample_npy = sample.cpu().numpy()
 
     imgdir: str = experiment_config.imgdir # type: ignore
@@ -91,9 +81,9 @@ def eval_iteration(experiment_config: ExperimentConfig, model: AnyModel, device:
     plt.xlim(xmin, xmax)
     plt.ylim(ymin, ymax)
 
-    image_path = f"{imgdir}/{epoch}.png"
+    image_path = f"{imgdir}/{prefix}{epoch}.png"
     plt.savefig(image_path)
-    plt.title(f"Epoch {epoch}")
+    plt.title(f"{prefix}Epoch {epoch}")
     plt.close()
 
     return sample_npy
@@ -118,8 +108,6 @@ if __name__ == "__main__":
     model = get_model(experiment_config)
     model = model.to(device)
 
-    outdir: str = experiment_config.outdir # type: ignore
-
     noise_scheduler = NoiseScheduler(
         num_timesteps=experiment_config.num_timesteps,
         beta_schedule=experiment_config.beta_schedule,
@@ -132,6 +120,8 @@ if __name__ == "__main__":
     )
 
     killer = GracefulKiller()
+
+    outdir: str = experiment_config.outdir # type: ignore
 
     global_step = 0
     frames = []
@@ -162,14 +152,15 @@ if __name__ == "__main__":
         progress_bar.close()
 
         if epoch % experiment_config.save_images_step == 0 or epoch == experiment_config.num_epochs - 1:
-            # generate data with the model to later visualize the learning process
-            frame = eval_iteration(experiment_config, model, device=device)
-            frames.append(frame)
+            with torch.no_grad():
+                # generate data with the model to later visualize the learning process
+                frame = eval_iteration(experiment_config, model, noise_scheduler, device=device, epoch=epoch)
+                frames.append(frame)
 
-            metrics_value = metric_nearest_distance(frame, dataset_frame_numpy)
-            metric_max.append(metrics_value.value_max)
-            metric_sum.append(metrics_value.value_sum)
-            metric_mean.append(metrics_value.value_mean)
+                metrics_value = metric_nearest_distance(frame, dataset_frame_numpy)
+                metric_max.append(metrics_value.value_max)
+                metric_sum.append(metrics_value.value_sum)
+                metric_mean.append(metrics_value.value_mean)
 
     print("Saving model...")
     os.makedirs(outdir, exist_ok=True)
