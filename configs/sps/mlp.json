@@ -5,7 +5,7 @@
     "dataset": "dino",
     "train_batch_size": 200,
     "eval_batch_size": 1000,
-    "num_epochs": 50,
+    "num_epochs": 100,
     "sps_checkpoint": null,
     "learning_rate": 0.001,
     "num_timesteps": 128,

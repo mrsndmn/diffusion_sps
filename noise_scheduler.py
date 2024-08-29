@@ -18,6 +18,8 @@ class NoiseScheduler():
                 beta_start ** 0.5, beta_end ** 0.5, num_timesteps, dtype=torch.float32, device=device) ** 2
 
         self.alphas = 1.0 - self.betas
+        self.alphas_sqrt = torch.sqrt(self.alphas)
+
         self.alphas_cumprod = torch.cumprod(self.alphas, axis=0)
         self.alphas_cumprod_prev = F.pad(
             self.alphas_cumprod[:-1], (1, 0), value=1.)
@@ -30,6 +32,10 @@ class NoiseScheduler():
         self.sqrt_inv_alphas_cumprod = torch.sqrt(1 / self.alphas_cumprod)
         self.sqrt_inv_alphas_cumprod_minus_one = torch.sqrt(
             1 / self.alphas_cumprod - 1)
+
+        self.inv_sqrt_alphas =  1 / torch.sqrt(self.alphas)
+
+        self.noise_multiplicator_k = self.betas / self.sqrt_one_minus_alphas_cumprod
 
         # required for q_posterior
         self.posterior_mean_coef1 = self.betas * torch.sqrt(self.alphas_cumprod_prev) / (1. - self.alphas_cumprod)
@@ -60,14 +66,22 @@ class NoiseScheduler():
 
     def step(self, model_output, timestep: torch.Tensor, sample, noise=None):
         t = timestep
-        pred_original_sample = self.reconstruct_x0(sample, t, model_output)
-        pred_prev_sample = self.q_posterior(pred_original_sample, sample, t)
+
+        betas_t = self.betas[t].unsqueeze(1)
+        sqrt_one_minus_alphas_cumprod_t = self.sqrt_one_minus_alphas_cumprod[t].unsqueeze(1)
+        inv_sqrt_alphas_t = self.inv_sqrt_alphas[t].unsqueeze(1)
+
+        # Equation 11 in the paper
+        # Use our model (noise predictor) to predict the mean
+        pred_prev_sample = inv_sqrt_alphas_t * (
+            sample - betas_t / sqrt_one_minus_alphas_cumprod_t * model_output
+        )
 
         variance = torch.zeros_like(pred_prev_sample)
-        if noise is None:
-            noise = torch.randn_like(model_output)
-
         if (t > 0).any():
+            if noise is None:
+                noise = torch.randn_like(model_output)
+
             t_gt_0 = t[t > 0]
             variance[t > 0] = (self.get_variance(t_gt_0) ** 0.5) * noise[t > 0]
 
@@ -89,4 +103,5 @@ class NoiseScheduler():
 
     def prepare_timesteps_for_sampling(self, step=1):
         return torch.tensor(list(range(self.num_timesteps))[::-step], dtype=torch.long)
+
 

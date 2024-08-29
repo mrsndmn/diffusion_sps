@@ -5,7 +5,7 @@
     "dataset": "dino",
     "train_batch_size": 200,
     "eval_batch_size": 1000,
-    "num_epochs": 20,
+    "num_epochs": 100,
     "learning_rate": 0.0001,
     "num_timesteps": 128,
     "beta_schedule": "linear",
@@ -17,7 +17,7 @@
     "device": "cpu",
     "sps_checkpoint": null,
 
-    "distillation_steps": 5,
+    "distillation_steps": 1,
     "distillation_factor": 2,
     "teacher_checkpoint": "exps/mlp/model.pth"
 }

@@ -2,6 +2,7 @@ import argparse
 import os
 from typing import Dict, List
 import random
+from dataclasses import asdict
 
 import torch
 from torch import nn
@@ -12,6 +13,7 @@ from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 import numpy as np
 
+import pandas as pd
 
 from torch.profiler import profile, record_function, ProfilerActivity
 
@@ -53,31 +55,34 @@ if __name__ == "__main__":
 
     class NoopKiller:
         kill_now = False
-    killer = NoopKiller()
-    # killer = GracefulKiller()
+    # killer = NoopKiller()
+    killer = GracefulKiller()
 
     global_step = 0
     frames = []
     losses = []
-    metric_max = []
-    metric_sum = []
-    metric_mean = []
-
+    metrics = []
 
     for distillation_step in range(0, experiment_config.distillation_steps):
 
         student_model = get_model(experiment_config)
         student_model.load_state_dict(teacher_model.state_dict())
 
-        # todo change model timesteps count
         distillation_factor = experiment_config.distillation_factor
-        current_num_timesteps = int(experiment_config.num_timesteps / (distillation_factor**distillation_step))
+        student_timesteps_scale = distillation_factor**distillation_step
+
+        student_model.time_mlp.scale = student_timesteps_scale
+
+        # todo change model timesteps count
+        current_num_timesteps = int(experiment_config.num_timesteps / student_timesteps_scale)
         print("current_num_timesteps", current_num_timesteps)
         teacher_noise_scheduler = NoiseScheduler(
             num_timesteps=current_num_timesteps,
             beta_schedule=experiment_config.beta_schedule,
             device=device,
         )
+
+        # todo взять формулы для шедулера из формулы!
         student_noise_scheduler = NoiseScheduler(
             num_timesteps=int(current_num_timesteps / distillation_factor),
             beta_schedule=experiment_config.beta_schedule,
@@ -123,6 +128,7 @@ if __name__ == "__main__":
                 # и обучаться ученик
                 timesteps = timesteps - torch.remainder(timesteps, 2)
                 timesteps_next = timesteps - 1
+                student_timesteps = (timesteps / 2).long()
 
                 noise = torch.randn(batch.shape, device=device)
                 noisy = teacher_noise_scheduler.add_noise(batch, noise, timesteps)
@@ -140,7 +146,8 @@ if __name__ == "__main__":
                     else:
                         teacher_noise_pred1 = teacher_model(noisy, timesteps)
 
-                    empty_noize = torch.zeros_like(teacher_noise_pred1)
+                    empty_noize = None
+                    # empty_noize = torch.zeros_like(teacher_noise_pred1)
 
                     teacher_sample1 = teacher_noise_scheduler.step(teacher_noise_pred1, timesteps, noisy, noise=empty_noize)
                     # teacher_sample1 = alpha_t * teacher_noise_pred1 +
@@ -155,9 +162,9 @@ if __name__ == "__main__":
 
                 if experiment_config.nn_model_type == ModelTypeEnum.mlp_sps:
                     # model: MLPSPS
-                    student_noise_pred = student_model.forward_single_timestep(noisy, timesteps)
+                    student_noise_pred = student_model.forward_single_timestep(noisy, student_timesteps)
                 else:
-                    student_noise_pred = student_model(noisy, timesteps)
+                    student_noise_pred = student_model(noisy, student_timesteps)
 
                 # из статьи
                 # teacher_noise_total = (teacher_sample2 - (sigma_tss / sigma_t ) * noisy) / ( alpha_tss - (sigma_tss / sigma_t) * alpha_t )
@@ -169,7 +176,16 @@ if __name__ == "__main__":
                 # teacher_noise_total = (teacher_noise_pred2 - (sigma_tss / sigma_t ) * teacher_noise_pred1) / ( alpha_tss - (sigma_tss / sigma_t) * alpha_t )
 
                 # самодельный просто сумма с двух предыдущих шагов -- не очень плохо
-                teacher_noise_total = teacher_noise_pred2 + teacher_noise_pred1
+                # teacher_noise_total = teacher_noise_pred2 + teacher_noise_pred1
+
+                # самодельный вывел из формул
+                noise_mult_t = teacher_noise_scheduler.noise_multiplicator_k[timesteps].unsqueeze(1)
+                noise_mult_t_next = (teacher_noise_scheduler.noise_multiplicator_k[timesteps_next] * teacher_noise_scheduler.alphas_sqrt[timesteps]).unsqueeze(1)
+                student_noise_mult = student_noise_scheduler.noise_multiplicator_k[student_timesteps].unsqueeze(1)
+
+                teacher_noise_total = (
+                        teacher_noise_pred1 * noise_mult_t + teacher_noise_pred2 * noise_mult_t_next
+                    ) / student_noise_mult
 
                 # snr = alpha_t ** 2 / sigma_t ** 2
                 # loss_weight = torch.masked_fill(snr, snr > 1, 1)
@@ -203,9 +219,7 @@ if __name__ == "__main__":
 
                     metrics_value = metric_nearest_distance(frame, dataset_frame_numpy)
                     print("metrics_value", metrics_value)
-                    metric_max.append(metrics_value.value_max)
-                    metric_sum.append(metrics_value.value_sum)
-                    metric_mean.append(metrics_value.value_mean)
+                    metrics.append(asdict(metrics_value))
                     if metrics_value.value_mean > 1.0:
                         raise Exception("too bad metrics")
             # Epoch end
@@ -234,6 +248,21 @@ if __name__ == "__main__":
     plt.title(f"[{experiment_name}] Loss")
     plt.savefig(f"{outdir}/loss.png")
     plt.close()
+
+    metrics_df = pd.DataFrame(metrics)
+
+    print("Saving metrics")
+    for metric_name in metrics_df.columns:
+        metric_values = metrics_df[metric_name]
+        metric_path = os.path.join(experiment_config.outdir, metric_name + ".npy") # type: ignore
+        np.save(metric_path, np.array(metric_values))
+
+        metric_image_path = os.path.join(experiment_config.outdir, metric_name + ".png") # type: ignore
+        plt.figure(figsize=(10, 10))
+        plt.plot(metric_values)
+        plt.title(f"[{experiment_name}] {metric_name}")
+        plt.savefig(metric_image_path)
+        plt.close()
 
     print("Saving frames...")
     frames = np.stack(frames)

@@ -187,7 +187,7 @@ if __name__ == "__main__":
 
     print("Saving metrics")
     for metric_name in metrics_df.columns:
-        metric_values = metrics_df['metric_name']
+        metric_values = metrics_df[metric_name]
         metric_path = os.path.join(experiment_config.outdir, metric_name + ".npy") # type: ignore
         np.save(metric_path, np.array(metric_values))
 
