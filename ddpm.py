@@ -3,6 +3,9 @@ import os
 import signal
 from typing import Dict, List
 import random
+import pandas as pd
+
+from dataclasses import asdict
 
 import torch
 from torch import nn
@@ -126,9 +129,8 @@ if __name__ == "__main__":
     global_step = 0
     frames = []
     losses = []
-    metric_max = []
-    metric_sum = []
-    metric_mean = []
+
+    metrics = []
 
     print("Training model...")
     for epoch in range(experiment_config.num_epochs):
@@ -158,9 +160,7 @@ if __name__ == "__main__":
                 frames.append(frame)
 
                 metrics_value = metric_nearest_distance(frame, dataset_frame_numpy)
-                metric_max.append(metrics_value.value_max)
-                metric_sum.append(metrics_value.value_sum)
-                metric_mean.append(metrics_value.value_mean)
+                metrics.append(asdict(metrics_value))
 
     print("Saving model...")
     os.makedirs(outdir, exist_ok=True)
@@ -183,13 +183,11 @@ if __name__ == "__main__":
     plt.savefig(f"{outdir}/loss.png")
     plt.close()
 
+    metrics_df = pd.DataFrame(metrics)
+
     print("Saving metrics")
-    metrics_named: Dict[str, List[float]] = {
-        "metric_max": metric_max,
-        "metric_sum": metric_sum,
-        "metric_mean": metric_mean,
-    }
-    for metric_name, metric_values in metrics_named.items():
+    for metric_name in metrics_df.columns:
+        metric_values = metrics_df['metric_name']
         metric_path = os.path.join(experiment_config.outdir, metric_name + ".npy") # type: ignore
         np.save(metric_path, np.array(metric_values))
 

@@ -163,9 +163,13 @@ if __name__ == "__main__":
                 # teacher_noise_total = (teacher_sample2 - (sigma_tss / sigma_t ) * noisy) / ( alpha_tss - (sigma_tss / sigma_t) * alpha_t )
                 # без делителя
                 # teacher_noise_total = (teacher_sample2 - (sigma_tss / sigma_t ) * noisy) # / ( alpha_tss - (sigma_tss / sigma_t) * alpha_t )
-                # самодельный просто сумма с двух предыдущих шагов
-                teacher_noise_total = teacher_noise_pred2 + teacher_noise_pred1
+                # просто разница -- плохо работает
                 # teacher_noise_total = teacher_sample2 - noisy
+
+                # teacher_noise_total = (teacher_noise_pred2 - (sigma_tss / sigma_t ) * teacher_noise_pred1) / ( alpha_tss - (sigma_tss / sigma_t) * alpha_t )
+
+                # самодельный просто сумма с двух предыдущих шагов -- не очень плохо
+                teacher_noise_total = teacher_noise_pred2 + teacher_noise_pred1
 
                 # snr = alpha_t ** 2 / sigma_t ** 2
                 # loss_weight = torch.masked_fill(snr, snr > 1, 1)
