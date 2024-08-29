@@ -97,6 +97,7 @@ class ExperimentConfig(BaseModel):
 
 class ProgressiveDistillationExperimentConfig(ExperimentConfig):
     distillation_steps: int # сколько раз будет уменьшаться количество таймстепов?
+    distillation_factor: int # во сколько раз будет уменьшаться количество таймстемпов?
     teacher_checkpoint: str
 
     @model_validator(mode='after')

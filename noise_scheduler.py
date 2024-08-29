@@ -58,16 +58,18 @@ class NoiseScheduler():
         variance = variance.clip(1e-20)
         return variance.unsqueeze(1)
 
-    def step(self, model_output, timestep: torch.Tensor, sample):
+    def step(self, model_output, timestep: torch.Tensor, sample, noise=None):
         t = timestep
         pred_original_sample = self.reconstruct_x0(sample, t, model_output)
         pred_prev_sample = self.q_posterior(pred_original_sample, sample, t)
 
         variance = torch.zeros_like(pred_prev_sample)
-        noise = torch.randn_like(model_output)
+        if noise is None:
+            noise = torch.randn_like(model_output)
 
         if (t > 0).any():
-            variance[t > 0] = (self.get_variance(t) ** 0.5) * noise
+            t_gt_0 = t[t > 0]
+            variance[t > 0] = (self.get_variance(t_gt_0) ** 0.5) * noise[t > 0]
 
         pred_prev_sample = pred_prev_sample + variance
 
@@ -85,6 +87,6 @@ class NoiseScheduler():
     def __len__(self):
         return self.num_timesteps
 
-    def prepare_timesteps_for_sampling(self):
-        return torch.tensor(list(range(self.num_timesteps))[::-1], dtype=torch.long)
+    def prepare_timesteps_for_sampling(self, step=1):
+        return torch.tensor(list(range(self.num_timesteps))[::-step], dtype=torch.long)
 

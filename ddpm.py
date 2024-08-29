@@ -57,11 +57,11 @@ def train_iteration(experiment_config: ExperimentConfig, model: AnyModel, optimi
     return loss
 
 
-def eval_iteration(experiment_config: ExperimentConfig, model: AnyModel, noise_scheduler: NoiseScheduler, device: DeviceEnum, epoch=0, prefix=''):
+def eval_iteration(experiment_config: ExperimentConfig, model: AnyModel, noise_scheduler: NoiseScheduler, device: DeviceEnum, scheduler_step=1, epoch=0, prefix=''):
 
     model.eval()
     sample = torch.randn(experiment_config.eval_batch_size, 2, device=device)
-    timesteps_reversed = noise_scheduler.prepare_timesteps_for_sampling()
+    timesteps_reversed = noise_scheduler.prepare_timesteps_for_sampling(step=scheduler_step)
     for i, t in enumerate(tqdm(timesteps_reversed)):
 
         full_timesteps = torch.full([experiment_config.eval_batch_size], t).long().to(device)

@@ -12,13 +12,13 @@ from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 import numpy as np
 
-import datasets
 
 from torch.profiler import profile, record_function, ProfilerActivity
 
 from pydantic_core import from_json
 
 # local imports
+import datasets
 from training import GracefulKiller
 from noise_scheduler import NoiseScheduler
 from config import ProgressiveDistillationExperimentConfig, DeviceEnum, ModelTypeEnum
@@ -51,7 +51,10 @@ if __name__ == "__main__":
     teacher_state_dict = torch.load(experiment_config.teacher_checkpoint)
     teacher_model.load_state_dict(teacher_state_dict)
 
-    killer = GracefulKiller()
+    class NoopKiller:
+        kill_now = False
+    killer = NoopKiller()
+    # killer = GracefulKiller()
 
     global_step = 0
     frames = []
@@ -61,20 +64,22 @@ if __name__ == "__main__":
     metric_mean = []
 
 
-    for distillation_step in range(1, experiment_config.distillation_steps+1):
+    for distillation_step in range(0, experiment_config.distillation_steps):
 
         student_model = get_model(experiment_config)
         student_model.load_state_dict(teacher_model.state_dict())
 
         # todo change model timesteps count
+        distillation_factor = experiment_config.distillation_factor
+        current_num_timesteps = int(experiment_config.num_timesteps / (distillation_factor**distillation_step))
+        print("current_num_timesteps", current_num_timesteps)
         teacher_noise_scheduler = NoiseScheduler(
-            num_timesteps=(experiment_config.num_timesteps // (2**(distillation_step - 1))),
+            num_timesteps=current_num_timesteps,
             beta_schedule=experiment_config.beta_schedule,
             device=device,
         )
-
         student_noise_scheduler = NoiseScheduler(
-            num_timesteps=(experiment_config.num_timesteps // (2**distillation_step)),
+            num_timesteps=int(current_num_timesteps / distillation_factor),
             beta_schedule=experiment_config.beta_schedule,
             device=device,
         )
@@ -85,7 +90,9 @@ if __name__ == "__main__":
         )
 
         with torch.no_grad():
-            eval_iteration(experiment_config, student_model, student_noise_scheduler, device=device, epoch=distillation_step, prefix=f'student_no_training_')
+            frame = eval_iteration(experiment_config, student_model, student_noise_scheduler, device=device, epoch=distillation_step, prefix=f'student_no_training_')
+            metrics_value = metric_nearest_distance(frame, dataset_frame_numpy)
+            print("metrics_value", metrics_value)
             eval_iteration(experiment_config, teacher_model, teacher_noise_scheduler, device=device, epoch=distillation_step, prefix=f'teacher_')
 
         student_model.train()
@@ -115,9 +122,15 @@ if __name__ == "__main__":
                 # для учителя нам нужны только четные таймстемпы, тк именно с них будет начинаться
                 # и обучаться ученик
                 timesteps = timesteps - torch.remainder(timesteps, 2)
+                timesteps_next = timesteps - 1
 
                 noise = torch.randn(batch.shape, device=device)
                 noisy = teacher_noise_scheduler.add_noise(batch, noise, timesteps)
+
+                sigma_t = teacher_noise_scheduler.sqrt_one_minus_alphas_cumprod[timesteps].unsqueeze(1)
+                sigma_tss = teacher_noise_scheduler.sqrt_one_minus_alphas_cumprod[timesteps_next].unsqueeze(1)
+                alpha_t = teacher_noise_scheduler.sqrt_alphas_cumprod[timesteps].unsqueeze(1)
+                alpha_tss = teacher_noise_scheduler.sqrt_alphas_cumprod[timesteps_next].unsqueeze(1)
 
                 # 2 step of teacher model
                 with torch.no_grad():
@@ -127,8 +140,10 @@ if __name__ == "__main__":
                     else:
                         teacher_noise_pred1 = teacher_model(noisy, timesteps)
 
-                    teacher_sample1 = teacher_noise_scheduler.step(teacher_noise_pred1, timesteps, noisy)
-                    timesteps_next = timesteps - 1
+                    empty_noize = torch.zeros_like(teacher_noise_pred1)
+
+                    teacher_sample1 = teacher_noise_scheduler.step(teacher_noise_pred1, timesteps, noisy, noise=empty_noize)
+                    # teacher_sample1 = alpha_t * teacher_noise_pred1 +
 
                     if experiment_config.nn_model_type == ModelTypeEnum.mlp_sps:
                         # model: MLPSPS
@@ -136,7 +151,7 @@ if __name__ == "__main__":
                     else:
                         teacher_noise_pred2 = teacher_model(teacher_sample1, timesteps_next)
 
-                    teacher_sample2 = teacher_noise_scheduler.step(teacher_noise_pred2, timesteps_next, teacher_sample1)
+                    teacher_sample2 = teacher_noise_scheduler.step(teacher_noise_pred2, timesteps_next, teacher_sample1, noise=empty_noize)
 
                 if experiment_config.nn_model_type == ModelTypeEnum.mlp_sps:
                     # model: MLPSPS
@@ -144,12 +159,21 @@ if __name__ == "__main__":
                 else:
                     student_noise_pred = student_model(noisy, timesteps)
 
-                sigma_tss = teacher_noise_scheduler.sqrt_one_minus_alphas_cumprod[timesteps_next].unsqueeze(1)
-                sigma_t = teacher_noise_scheduler.sqrt_one_minus_alphas_cumprod[timesteps].unsqueeze(1)
-                alpha_tss = teacher_noise_scheduler.sqrt_alphas_cumprod[timesteps_next].unsqueeze(1)
-                teacher_noise_total = (teacher_sample2 - (sigma_t / sigma_tss) * noisy) / ( alpha_tss - (sigma_t / sigma_tss) )
+                # из статьи
+                # teacher_noise_total = (teacher_sample2 - (sigma_tss / sigma_t ) * noisy) / ( alpha_tss - (sigma_tss / sigma_t) * alpha_t )
+                # без делителя
+                # teacher_noise_total = (teacher_sample2 - (sigma_tss / sigma_t ) * noisy) # / ( alpha_tss - (sigma_tss / sigma_t) * alpha_t )
+                # самодельный просто сумма с двух предыдущих шагов
+                teacher_noise_total = teacher_noise_pred2 + teacher_noise_pred1
+                # teacher_noise_total = teacher_sample2 - noisy
 
-                loss = F.mse_loss(student_noise_pred, teacher_noise_total)
+                # snr = alpha_t ** 2 / sigma_t ** 2
+                # loss_weight = torch.masked_fill(snr, snr > 1, 1)
+                loss = F.mse_loss(student_noise_pred, teacher_noise_total, reduction='none')
+                loss = loss.mean()
+
+                assert loss.item() < 10
+
                 loss.backward(loss)
 
                 nn.utils.clip_grad_norm_(student_model.parameters(), 1.0)
@@ -168,13 +192,23 @@ if __name__ == "__main__":
             if epoch % experiment_config.save_images_step == 0 or epoch == experiment_config.num_epochs - 1:
                 with torch.no_grad():
                     # generate data with the model to later visualize the learning process
-                    frame = eval_iteration(experiment_config, student_model, student_noise_scheduler, device=device, epoch=epoch, prefix='student_')
+
+                    student_num_timesteps = int(current_num_timesteps / distillation_factor)
+                    frame = eval_iteration(experiment_config, student_model, student_noise_scheduler,  device=device, epoch=epoch, prefix=f'student_{student_num_timesteps}_')
                     frames.append(frame)
 
                     metrics_value = metric_nearest_distance(frame, dataset_frame_numpy)
+                    print("metrics_value", metrics_value)
                     metric_max.append(metrics_value.value_max)
                     metric_sum.append(metrics_value.value_sum)
                     metric_mean.append(metrics_value.value_mean)
+                    if metrics_value.value_mean > 1.0:
+                        raise Exception("too bad metrics")
+            # Epoch end
+
+        # Next distillation step
+        teacher_model = student_model
+
 
     print("Saving model...")
     os.makedirs(experiment_config.outdir, exist_ok=True) # type: ignore
