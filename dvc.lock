@@ -40,3 +40,54 @@ stages:
       md5: 16e7c010d8f5c1a4289441553cf423ff.dir
       size: 64046
       nfiles: 1
+  pd_mlp_pretrain_128:
+    cmd: PYTHONPATH=. python ddpm.py --config configs/progressive_distillation/mlp_pretrain_128.json
+    deps:
+    - path: configs/progressive_distillation/mlp_pretrain_128.json
+      hash: md5
+      md5: cf8feaa82ef1f6d75a41096d84f5f528
+      size: 487
+    - path: static
+      hash: md5
+      md5: 16e7c010d8f5c1a4289441553cf423ff.dir
+      size: 64046
+      nfiles: 1
+    outs:
+    - path: exps/mlp_pretrain_128/model.pth
+      hash: md5
+      md5: 627163ab0542985b1963eb2476d50f5e
+      size: 399836
+  pd_simple:
+    cmd: PYTHONPATH=. python ddpm.py --config configs/progressive_distillation/mlp_pretrain_128_progressive_distillation.json
+    deps:
+    - path: configs/progressive_distillation/mlp_pretrain_128_progressive_distillation.json
+      hash: md5
+      md5: 3e6fc8d7057cdc271c834247f722d742
+      size: 682
+    - path: exps/mlp_pretrain_128/model.pth
+      hash: md5
+      md5: 627163ab0542985b1963eb2476d50f5e
+      size: 399836
+    - path: static
+      hash: md5
+      md5: 16e7c010d8f5c1a4289441553cf423ff.dir
+      size: 64046
+      nfiles: 1
+  pd_simple_beta_correction:
+    cmd: PYTHONPATH=. python ddpm.py --config 
+      configs/progressive_distillation/mlp_pretrain_128_progressive_distillation_beta_correction.json
+    deps:
+    - path: 
+        configs/progressive_distillation/mlp_pretrain_128_progressive_distillation_beta_correction.json
+      hash: md5
+      md5: 4431b9454081ce211fbff9f9bddccb52
+      size: 697
+    - path: exps/mlp_pretrain_128/model.pth
+      hash: md5
+      md5: 627163ab0542985b1963eb2476d50f5e
+      size: 399836
+    - path: static
+      hash: md5
+      md5: 16e7c010d8f5c1a4289441553cf423ff.dir
+      size: 64046
+      nfiles: 1

@@ -19,6 +19,6 @@
 
     "distillation_steps": 1,
     "distillation_factor": 2,
-    "teacher_checkpoint": "exps/mlp/model.pth",
+    "teacher_checkpoint": "exps/mlp_pretrain_128/model.pth",
     "student_scheduler_beta_correction": false
 }
