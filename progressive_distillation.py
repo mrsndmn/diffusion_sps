@@ -159,23 +159,6 @@ if __name__ == "__main__":
 
                 student_noise_pred = student_model(noisy, student_timesteps)
 
-                # sigma_t = teacher_noise_scheduler.sqrt_one_minus_alphas_cumprod[timesteps].unsqueeze(1)
-                # sigma_tss = teacher_noise_scheduler.sqrt_one_minus_alphas_cumprod[timesteps_next].unsqueeze(1)
-                # alpha_t = teacher_noise_scheduler.sqrt_alphas_cumprod[timesteps].unsqueeze(1)
-                # alpha_tss = teacher_noise_scheduler.sqrt_alphas_cumprod[timesteps_next].unsqueeze(1)
-
-                # из статьи
-                # teacher_noise_total = (teacher_sample2 - (sigma_tss / sigma_t ) * noisy) / ( alpha_tss - (sigma_tss / sigma_t) * alpha_t )
-                # без делителя
-                # teacher_noise_total = (teacher_sample2 - (sigma_tss / sigma_t ) * noisy) # / ( alpha_tss - (sigma_tss / sigma_t) * alpha_t )
-                # просто разница -- плохо работает
-                # teacher_noise_total = teacher_sample2 - noisy
-
-                # teacher_noise_total = (teacher_noise_pred2 - (sigma_tss / sigma_t ) * teacher_noise_pred1) / ( alpha_tss - (sigma_tss / sigma_t) * alpha_t )
-
-                # самодельный просто сумма с двух предыдущих шагов -- не очень плохо
-                # teacher_noise_total = teacher_noise_pred2 + teacher_noise_pred1
-
                 # самодельный вывел из формул
                 noise_mult_t = teacher_noise_scheduler.noise_multiplicator_k[timesteps].unsqueeze(1)
                 noise_mult_t_next = (teacher_noise_scheduler.noise_multiplicator_k[timesteps_next] * teacher_noise_scheduler.alphas_sqrt[timesteps]).unsqueeze(1)
