@@ -4,6 +4,8 @@ stages:
     deps:
     - static
     - configs/sps/mlp.json # todo move to param
+    outs:
+    - exps/mlp/model.pth
   train_mlp_sps_from_scratch:
     cmd: PYTHONPATH=. python ddpm.py --config configs/sps/mlp_sps_from_scratch.json
     deps:
@@ -15,3 +17,24 @@ stages:
     - static
     - configs/sps/mlp_sps_from_pretrained.json # todo move to param
     - exps/mlp/model.pth # todo move to params and to config template
+
+
+  pd_mlp_pretrain_128:
+    cmd: PYTHONPATH=. python ddpm.py --config configs/progressive_distillation/mlp_pretrain_128.json
+    deps:
+    - static
+    - configs/progressive_distillation/mlp_pretrain_128.json # todo move to param
+    outs:
+    - exps/mlp_pretrain_128/model.pth
+  pd_simple:
+    cmd: PYTHONPATH=. python ddpm.py --config configs/progressive_distillation/mlp_pretrain_128_progressive_distillation.json
+    deps:
+    - static
+    - configs/progressive_distillation/mlp_pretrain_128_progressive_distillation.json # todo move to param
+    - exps/mlp_pretrain_128/model.pth
+  pd_simple_bera_correction:
+    cmd: PYTHONPATH=. python ddpm.py --config configs/progressive_distillation/mlp_pretrain_128_progressive_distillation_beta_correction.json
+    deps:
+    - static
+    - configs/progressive_distillation/mlp_pretrain_128_progressive_distillation_beta_correction.json # todo move to param
+    - exps/mlp_pretrain_128/model.pth
