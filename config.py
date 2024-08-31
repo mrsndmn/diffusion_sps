@@ -4,7 +4,7 @@ from typing_extensions import Self
 from dataclasses import dataclass
 
 import torch
-from pydantic import BaseModel, model_validator, computed_field
+from pydantic import BaseModel, model_validator, computed_field, ConfigDict
 from enum import Enum
 
 import os
@@ -43,6 +43,8 @@ class TimeEmbeddingEnum(str, Enum):
 
 
 class ExperimentConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     experiment_name: str
     dataset: DatasetEnum
     nn_model_type: ModelTypeEnum
@@ -99,6 +101,7 @@ class ExperimentConfig(BaseModel):
 
 @dataclass
 class ProgressiveDistillationExperimentConfig(ExperimentConfig):
+
     distillation_steps: int # сколько раз будет уменьшаться количество таймстепов?
     distillation_factor: int # во сколько раз будет уменьшаться количество таймстемпов?
     teacher_checkpoint: str

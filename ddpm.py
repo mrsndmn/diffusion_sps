@@ -101,7 +101,12 @@ if __name__ == "__main__":
 
     experiment_config = ExperimentConfig.model_validate_json(config_json_data)
 
-    run = wandb.init(project="diffusion_sps", notes=f"From config {arguments.config}", config=experiment_config.model_dump())
+    run = wandb.init(
+        project="diffusion_sps",
+        name=experiment_config.experiment_name,
+        notes=f"From config {arguments.config}",
+        config=experiment_config.model_dump(),
+    )
 
     dataset = datasets.get_dataset(experiment_config.dataset)
     dataset_frame_numpy: np.ndarray = np.vstack([ t.numpy() for t in dataset.tensors ])

@@ -27,13 +27,13 @@ stages:
     outs:
     - exps/mlp_pretrain_128/model.pth
   pd_simple:
-    cmd: PYTHONPATH=. python ddpm.py --config configs/progressive_distillation/mlp_pretrain_128_progressive_distillation.json
+    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/mlp_pretrain_128_progressive_distillation.json
     deps:
     - static
     - configs/progressive_distillation/mlp_pretrain_128_progressive_distillation.json # todo move to param
     - exps/mlp_pretrain_128/model.pth
   pd_simple_beta_correction:
-    cmd: PYTHONPATH=. python ddpm.py --config configs/progressive_distillation/mlp_pretrain_128_progressive_distillation_beta_correction.json
+    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/mlp_pretrain_128_progressive_distillation_beta_correction.json
     deps:
     - static
     - configs/progressive_distillation/mlp_pretrain_128_progressive_distillation_beta_correction.json # todo move to param
