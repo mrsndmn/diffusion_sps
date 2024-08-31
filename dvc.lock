@@ -94,7 +94,7 @@ stages:
     deps:
     - path: configs/progressive_distillation/progressive_distillation_multistage.json
       hash: md5
-      md5: 3c0d2ba7668b2b210e32b3571cdba872
+      md5: ed0039da5758271cbf4852fb2d442e31
       size: 644
     - path: exps/mlp_pretrain_128/model.pth
       hash: md5
@@ -102,8 +102,8 @@ stages:
       size: 399836
     - path: progressive_distillation.py
       hash: md5
-      md5: d531bdd4503a67d44199447e71c35911
-      size: 9635
+      md5: 9bc9760bb18ad219aaadd24dcc636d38
+      size: 9702
     - path: static
       hash: md5
       md5: 16e7c010d8f5c1a4289441553cf423ff.dir
@@ -114,7 +114,7 @@ stages:
     deps:
     - path: configs/progressive_distillation/progressive_distillation_multistage_sps.json
       hash: md5
-      md5: 219a9a74123610809c1c5bac7668b194
+      md5: 3638c29edf33a526cfd90535f4a20319
       size: 652
     - path: exps/mlp_pretrain_128/model.pth
       hash: md5

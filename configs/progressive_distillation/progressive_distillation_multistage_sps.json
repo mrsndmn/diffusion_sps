@@ -17,7 +17,7 @@
     "device": "cpu",
     "sps_checkpoint": "exps/mlp_pretrain_128/model.pth",
 
-    "distillation_steps": 4,
+    "distillation_steps": 5,
     "teacher_checkpoint": null,
     "student_scheduler_beta_correction": true
 }
