@@ -46,3 +46,11 @@ stages:
     - static
     - configs/progressive_distillation/progressive_distillation_multistage.json # todo move to param
     - exps/mlp_pretrain_128/model.pth
+
+  pd_multistage_sps:
+    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/progressive_distillation_multistage_sps.json
+    deps:
+    - progressive_distillation.py
+    - static
+    - configs/progressive_distillation/progressive_distillation_multistage_sps.json # todo move to param
+    - exps/mlp_pretrain_128/model.pth
