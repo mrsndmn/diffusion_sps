@@ -1,6 +1,8 @@
 from typing import Optional
 from typing_extensions import Self
 
+from dataclasses import dataclass
+
 import torch
 from pydantic import BaseModel, model_validator, computed_field
 from enum import Enum
@@ -40,6 +42,7 @@ class TimeEmbeddingEnum(str, Enum):
     identity   = "identity"
 
 
+@dataclass
 class ExperimentConfig(BaseModel):
     experiment_name: str
     dataset: DatasetEnum

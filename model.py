@@ -69,17 +69,7 @@ class MLPSPS(nn.Module):
             self.mlp_sps[i].load_state_dict(torch_state_dict)
 
     def forward(self, x, t):
-        prediction = []
-        # print("self.mlp_sps", len(self.mlp_sps), "timesteps", t)
-        for i in range(t.shape[0]):
-            t_i = t[i]
-            prediction.append(self.mlp_sps[t_i](x[i:i+1], t[i:i+1]))
-
-        return torch.vstack(prediction)
-
-    def forward_single_timestep(self, x, t):
         assert (t == t[0]).all(), 'all values of t is expected to be equal'
-
         predictions = self.mlp_sps[t[0]](x, t)
         return predictions
 

@@ -14,6 +14,6 @@
     "hidden_size": 128,
     "time_embedding": "sinusoidal",
     "input_embedding": "sinusoidal",
-    "save_images_step": 10,
+    "save_images_step": 25,
     "device": "cpu"
 }

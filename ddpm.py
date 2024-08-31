@@ -29,6 +29,9 @@ from config import ExperimentConfig, DeviceEnum, ModelTypeEnum
 from model import get_model, MLP, MLPSPS, AnyModel
 from metric import metric_nearest_distance
 
+# Import the W&B Python Library
+import wandb
+
 def train_iteration(experiment_config: ExperimentConfig, model: AnyModel, optimizer, batch, device: DeviceEnum):
     batch = batch[0].to(device)
     noise = torch.randn(batch.shape, device=device)
@@ -43,11 +46,7 @@ def train_iteration(experiment_config: ExperimentConfig, model: AnyModel, optimi
 
     noisy = noise_scheduler.add_noise(batch, noise, timesteps)
 
-    if experiment_config.nn_model_type == ModelTypeEnum.mlp_sps:
-        # model: MLPSPS
-        noise_pred = model.forward_single_timestep(noisy, timesteps)
-    else:
-        noise_pred = model(noisy, timesteps)
+    noise_pred = model(noisy, timesteps)
 
     loss = F.mse_loss(noise_pred, noise)
     loss.backward(loss)
@@ -96,10 +95,15 @@ if __name__ == "__main__":
     parser.add_argument("--config", type=str)
     arguments = config = parser.parse_args()
 
+    # 1. Start a W&B Run
+
+    #  2. Capture a dictionary of hyperparameters
     with open(arguments.config, 'r') as f:
         config_json_data = f.read()
 
     experiment_config = ExperimentConfig.model_validate_json(config_json_data)
+
+    run = wandb.init(project="diffusion_sps", notes=f"From config {arguments.config}", config=asdict(experiment_config))
 
     dataset = datasets.get_dataset(experiment_config.dataset)
     dataset_frame_numpy: np.ndarray = np.vstack([ t.numpy() for t in dataset.tensors ])
@@ -126,12 +130,6 @@ if __name__ == "__main__":
 
     outdir: str = experiment_config.outdir # type: ignore
 
-    global_step = 0
-    frames = []
-    losses = []
-
-    metrics = []
-
     print("Training model...")
     for epoch in range(experiment_config.num_epochs):
         if killer.kill_now:
@@ -147,57 +145,31 @@ if __name__ == "__main__":
             loss = train_iteration(experiment_config, model, optimizer, batch, device=device)
 
             progress_bar.update(1)
-            logs = {"loss": loss.detach().item(), "step": global_step}
-            losses.append(loss.detach().item())
+            logs = {
+                "loss": loss.detach().item()
+            }
+            run.log(logs)
+
             progress_bar.set_postfix(logs)
-            global_step += 1
         progress_bar.close()
 
         if epoch % experiment_config.save_images_step == 0 or epoch == experiment_config.num_epochs - 1:
             with torch.no_grad():
                 # generate data with the model to later visualize the learning process
                 frame = eval_iteration(experiment_config, model, noise_scheduler, device=device, epoch=epoch)
-                frames.append(frame)
 
                 metrics_value = metric_nearest_distance(frame, dataset_frame_numpy)
-                metrics.append(asdict(metrics_value))
+                validation_logs = {
+                    ("validation/"+ k): v for k, v in asdict(metrics_value).items()
+                }
+
+                frame_table = wandb.Table(data=frame, columns=["x", "y"])
+                plot_title = f"Epoch {epoch}"
+                validation_logs[f"frames/{plot_title}"] = wandb.plot.scatter(frame_table, "x", "y", title=plot_title, split_table=True)
+                run.log(validation_logs)
 
     print("Saving model...")
     os.makedirs(outdir, exist_ok=True)
     torch.save(model.state_dict(), f"{outdir}/model.pth")
 
     experiment_name = experiment_config.experiment_name
-
-    print("Saving loss as numpy array...")
-    np.save(f"{outdir}/loss.npy", np.array(losses))
-    plt.figure(figsize=(10, 10))
-    plt.plot(losses)
-    plt.title(f"[{experiment_name}] Loss")
-    plt.savefig(f"{outdir}/loss.png")
-    plt.close()
-
-    np.save(f"{outdir}/loss.npy", np.array(losses))
-    plt.figure(figsize=(10, 10))
-    plt.plot(losses)
-    plt.title(f"[{experiment_name}] Loss")
-    plt.savefig(f"{outdir}/loss.png")
-    plt.close()
-
-    metrics_df = pd.DataFrame(metrics)
-
-    print("Saving metrics")
-    for metric_name in metrics_df.columns:
-        metric_values = metrics_df[metric_name]
-        metric_path = os.path.join(experiment_config.outdir, metric_name + ".npy") # type: ignore
-        np.save(metric_path, np.array(metric_values))
-
-        metric_image_path = os.path.join(experiment_config.outdir, metric_name + ".png") # type: ignore
-        plt.figure(figsize=(10, 10))
-        plt.plot(metric_values)
-        plt.title(f"[{experiment_name}] {metric_name}")
-        plt.savefig(metric_image_path)
-        plt.close()
-
-    print("Saving frames...")
-    frames = np.stack(frames)
-    np.save(f"{outdir}/frames.npy", frames)
