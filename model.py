@@ -41,6 +41,10 @@ class MLP(nn.Module):
         x = self.joint_mlp(x)
         return x
 
+    def set_time_mlp_scale(self, timesteps_scale):
+        self.time_mlp.layer.scale = timesteps_scale
+        return
+
 class MLPSPS(nn.Module):
     def __init__(
             self, hidden_size: int = 128, hidden_layers: int = 3, emb_size: int = 128,
@@ -70,14 +74,22 @@ class MLPSPS(nn.Module):
 
     def forward(self, x, t):
         assert (t == t[0]).all(), 'all values of t is expected to be equal'
-        predictions = self.mlp_sps[t[0]](x, t)
+
+        timestep = t[0]
+        corrected_timestep = int(timestep/self.mlp_sps[0].time_mlp.layer.scale)
+
+        predictions = self.mlp_sps[corrected_timestep](x, t)
         return predictions
 
+    def set_time_mlp_scale(self, timesteps_scale: float):
+        for i in range(self.num_timesteps):
+            self.mlp_sps[i].time_mlp.scale = timesteps_scale
+        return
 
 
 AnyModel = Union[MLP, MLPSPS]
 
-def get_model(config: ExperimentConfig):
+def get_model(config: ExperimentConfig, ):
 
     model: Union[MLP | MLPSPS]
 

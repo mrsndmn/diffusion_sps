@@ -103,7 +103,7 @@ class ExperimentConfig(BaseModel):
 class ProgressiveDistillationExperimentConfig(ExperimentConfig):
 
     distillation_steps: int # сколько раз будет уменьшаться количество таймстепов?
-    teacher_checkpoint: str
+    teacher_checkpoint: Optional[str]
 
     student_scheduler_beta_correction: bool
 

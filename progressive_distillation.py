@@ -126,9 +126,9 @@ if __name__ == "__main__":
     )
     teacher_noise_scheduler = RawNoiseScheduler.from_ddpm_schedule_config(initial_teacher_schedule_config)
 
-
-    teacher_state_dict = torch.load(experiment_config.teacher_checkpoint)
-    teacher_model.load_state_dict(teacher_state_dict)
+    if experiment_config.teacher_checkpoint is not None:
+        teacher_state_dict = torch.load(experiment_config.teacher_checkpoint)
+        teacher_model.load_state_dict(teacher_state_dict)
 
     class NoopKiller:
         kill_now = False
@@ -147,7 +147,7 @@ if __name__ == "__main__":
         # todo ablation study
         # сохранение таймстемпов
         student_timesteps_scale = 2**distillation_step
-        student_model.time_mlp.scale = student_timesteps_scale
+        student_model.set_time_mlp_scale(student_timesteps_scale)
 
         student_num_timesteps = int(experiment_config.num_timesteps / student_timesteps_scale)
         print("student_num_timesteps", student_num_timesteps, "student_timesteps_scale", student_timesteps_scale)
