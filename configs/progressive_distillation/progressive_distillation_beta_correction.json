@@ -6,7 +6,7 @@
     "train_batch_size": 200,
     "eval_batch_size": 1000,
     "num_epochs": 100,
-    "learning_rate": 0.0001,
+    "learning_rate": 0.001,
     "num_timesteps": 128,
     "beta_schedule": "linear",
     "embedding_size": 128,

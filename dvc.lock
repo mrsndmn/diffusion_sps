@@ -94,8 +94,8 @@ stages:
     deps:
     - path: configs/progressive_distillation/progressive_distillation_multistage.json
       hash: md5
-      md5: 83e8a65baca641f8ad08f6b38457da14
-      size: 645
+      md5: d61758a365f9512130aeebdffe317227
+      size: 644
     - path: exps/mlp_pretrain_128/model.pth
       hash: md5
       md5: b57c811a6a3253a2991481e39aa67981
