@@ -119,6 +119,14 @@ if __name__ == "__main__":
     teacher_model = get_model(experiment_config)
     teacher_model = teacher_model.to(device)
 
+    initial_teacher_schedule_config = DDPMScheduleConfig(
+        num_timesteps=experiment_config.num_timesteps,
+        beta_schedule=experiment_config.beta_schedule,
+        device=device
+    )
+    teacher_noise_scheduler = RawNoiseScheduler.from_ddpm_schedule_config(initial_teacher_schedule_config)
+
+
     teacher_state_dict = torch.load(experiment_config.teacher_checkpoint)
     teacher_model.load_state_dict(teacher_state_dict)
 
@@ -129,34 +137,28 @@ if __name__ == "__main__":
 
     pd_training = ProgressiveDistillationTraining(experiment_config)
 
-    for distillation_step in range(0, experiment_config.distillation_steps):
+    for distillation_step in range(1, experiment_config.distillation_steps+1):
+        if killer.kill_now:
+            break
 
         student_model = get_model(experiment_config)
         student_model.load_state_dict(teacher_model.state_dict())
 
-        distillation_factor = experiment_config.distillation_factor
-        student_timesteps_scale = distillation_factor**distillation_step
-
+        # todo ablation study
+        # сохранение таймстемпов
+        student_timesteps_scale = 2**distillation_step
         student_model.time_mlp.scale = student_timesteps_scale
 
-        # todo change model timesteps count
-        current_num_timesteps = int(experiment_config.num_timesteps / student_timesteps_scale)
-        print("current_num_timesteps", current_num_timesteps)
-
-        ddpm_schedule_config = DDPMScheduleConfig(
-            num_timesteps=experiment_config.num_timesteps,
-            beta_schedule=experiment_config.beta_schedule,
-            device=device
-        )
-        teacher_noise_scheduler = RawNoiseScheduler.from_ddpm_schedule_config(ddpm_schedule_config)
+        student_num_timesteps = int(experiment_config.num_timesteps / student_timesteps_scale)
+        print("student_num_timesteps", student_num_timesteps, "student_timesteps_scale", student_timesteps_scale)
 
         # todo взять формулы для шедулера из формулы!
         # todo прямо сейчас это шедулер с увеличивающейся дисперсией
-        student_beta_scale = 2 if experiment_config.student_scheduler_beta_correction else 1
+        student_beta_scale = 2**distillation_step if experiment_config.student_scheduler_beta_correction else 1
         student_ddpm_schedule_config = DDPMScheduleConfig(
-            num_timesteps=int(current_num_timesteps / distillation_factor),
+            num_timesteps=student_num_timesteps,
             beta_schedule=experiment_config.beta_schedule,
-            beta_end=ddpm_schedule_config.beta_end * student_beta_scale,
+            beta_end=(initial_teacher_schedule_config.beta_end * student_beta_scale),
             device=device
         )
         student_noise_scheduler = RawNoiseScheduler.from_ddpm_schedule_config(student_ddpm_schedule_config)
@@ -217,8 +219,7 @@ if __name__ == "__main__":
                 with torch.no_grad():
                     # generate data with the model to later visualize the learning process
 
-                    student_num_timesteps = int(current_num_timesteps / distillation_factor)
-                    frame = eval_iteration(experiment_config, student_model, student_noise_scheduler,  device=device, epoch=epoch, prefix=f'student_{student_num_timesteps}_')
+                    frame = eval_iteration(experiment_config, student_model, student_noise_scheduler,  device=device, epoch=epoch, prefix=f'student_{student_noise_scheduler.num_timesteps}_')
 
                     metrics_value = metric_nearest_distance(frame, dataset_frame_numpy)
                     print("metrics_value", metrics_value)
@@ -228,16 +229,17 @@ if __name__ == "__main__":
                     }
 
                     frame_table = wandb.Table(data=frame, columns=["x", "y"])
-                    plot_title = f"Epoch {epoch}"
+                    plot_title = f"Timesteps={student_noise_scheduler.num_timesteps} Epoch {epoch}"
                     validation_logs[f"frames/{plot_title}"] = wandb.plot.scatter(frame_table, "x", "y", title=plot_title, split_table=True)
                     run.log(validation_logs)
 
                     if metrics_value.value_mean > 1.0:
                         raise Exception("too bad metrics")
-            # Epoch end
+            # Epochs end
 
         # Next distillation step
         teacher_model = student_model
+        teacher_noise_scheduler = student_noise_scheduler
 
 
     print("Saving model...")

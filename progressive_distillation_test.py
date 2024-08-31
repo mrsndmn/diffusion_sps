@@ -14,7 +14,7 @@ from noise_scheduler import NoiseScheduler
 
 def test_pd():
 
-    with open('configs/progressive_distillation/mlp_pretrain_128_progressive_distillation.json', 'r') as f:
+    with open('configs/progressive_distillation/progressive_distillation.json', 'r') as f:
         config_json_data = f.read()
 
     experiment_config = ProgressiveDistillationExperimentConfig.model_validate_json(config_json_data)

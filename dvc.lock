@@ -58,9 +58,9 @@ stages:
       md5: b57c811a6a3253a2991481e39aa67981
       size: 399836
   pd_simple:
-    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/mlp_pretrain_128_progressive_distillation.json
+    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/progressive_distillation.json
     deps:
-    - path: configs/progressive_distillation/mlp_pretrain_128_progressive_distillation.json
+    - path: configs/progressive_distillation/progressive_distillation.json
       hash: md5
       md5: 3e6fc8d7057cdc271c834247f722d742
       size: 682
@@ -74,11 +74,9 @@ stages:
       size: 64046
       nfiles: 1
   pd_simple_beta_correction:
-    cmd: PYTHONPATH=. python progressive_distillation.py --config 
-      configs/progressive_distillation/mlp_pretrain_128_progressive_distillation_beta_correction.json
+    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/progressive_distillation_beta_correction.json
     deps:
-    - path: 
-        configs/progressive_distillation/mlp_pretrain_128_progressive_distillation_beta_correction.json
+    - path: configs/progressive_distillation/progressive_distillation_beta_correction.json
       hash: md5
       md5: 4431b9454081ce211fbff9f9bddccb52
       size: 697
@@ -86,6 +84,26 @@ stages:
       hash: md5
       md5: b57c811a6a3253a2991481e39aa67981
       size: 399836
+    - path: static
+      hash: md5
+      md5: 16e7c010d8f5c1a4289441553cf423ff.dir
+      size: 64046
+      nfiles: 1
+  pd_multistage:
+    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/progressive_distillation_multistage.json
+    deps:
+    - path: configs/progressive_distillation/progressive_distillation_multistage.json
+      hash: md5
+      md5: 3c0d2ba7668b2b210e32b3571cdba872
+      size: 644
+    - path: exps/mlp_pretrain_128/model.pth
+      hash: md5
+      md5: b57c811a6a3253a2991481e39aa67981
+      size: 399836
+    - path: progressive_distillation.py
+      hash: md5
+      md5: d531bdd4503a67d44199447e71c35911
+      size: 9635
     - path: static
       hash: md5
       md5: 16e7c010d8f5c1a4289441553cf423ff.dir

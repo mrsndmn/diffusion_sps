@@ -103,7 +103,6 @@ class ExperimentConfig(BaseModel):
 class ProgressiveDistillationExperimentConfig(ExperimentConfig):
 
     distillation_steps: int # сколько раз будет уменьшаться количество таймстепов?
-    distillation_factor: int # во сколько раз будет уменьшаться количество таймстемпов?
     teacher_checkpoint: str
 
     student_scheduler_beta_correction: bool
@@ -112,10 +111,10 @@ class ProgressiveDistillationExperimentConfig(ExperimentConfig):
     def runtime_after_validate_progressive_distillation(self: Self) -> Self:
         max_divider: int = 2**self.distillation_steps
         if self.num_timesteps % max_divider != 0:
-            raise ValueError("`num_timesteps` must be dividable by `distillation_steps*distillation_factor`")
+            raise ValueError("`num_timesteps` must be dividable by `2**distillation_steps`")
 
         if self.num_timesteps < max_divider:
-            raise ValueError("`num_timesteps` must be less than `distillation_steps*distillation_factor`")
+            raise ValueError("`num_timesteps` must be less than `2**distillation_steps`")
 
         return self
 

@@ -1,11 +1,11 @@
 {
-    "experiment_name": "mlp_pretrain_128_progressive_distillation",
+    "experiment_name": "progressive_distillation_multistage",
     "nn_model_type": "mlp",
     "hidden_layers": 3,
     "dataset": "dino",
     "train_batch_size": 200,
     "eval_batch_size": 1000,
-    "num_epochs": 100,
+    "num_epochs": 25,
     "learning_rate": 0.0001,
     "num_timesteps": 128,
     "beta_schedule": "linear",
@@ -17,8 +17,7 @@
     "device": "cpu",
     "sps_checkpoint": null,
 
-    "distillation_steps": 1,
-    "distillation_factor": 2,
+    "distillation_steps": 4,
     "teacher_checkpoint": "exps/mlp_pretrain_128/model.pth",
-    "student_scheduler_beta_correction": false
+    "student_scheduler_beta_correction": true
 }
