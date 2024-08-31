@@ -22,7 +22,7 @@ from pydantic_core import from_json
 
 # local imports
 from training import GracefulKiller
-from noise_scheduler import NoiseScheduler
+from noise_scheduler import RawNoiseScheduler, DDPMScheduleConfig
 from config import ExperimentConfig, DeviceEnum, ModelTypeEnum
 from model import get_model, MLP, MLPSPS, AnyModel
 from metric import metric_nearest_distance
@@ -57,7 +57,7 @@ def train_iteration(experiment_config: ExperimentConfig, model: AnyModel, optimi
     return loss
 
 
-def eval_iteration(experiment_config: ExperimentConfig, model: AnyModel, noise_scheduler: NoiseScheduler, device: DeviceEnum, scheduler_step=1, epoch=0, prefix=''):
+def eval_iteration(experiment_config: ExperimentConfig, model: AnyModel, noise_scheduler: RawNoiseScheduler, device: DeviceEnum, scheduler_step=1, epoch=0, prefix=''):
 
     model.eval()
     sample = torch.randn(experiment_config.eval_batch_size, 2, device=device)
@@ -113,11 +113,12 @@ if __name__ == "__main__":
     model = get_model(experiment_config)
     model = model.to(device)
 
-    noise_scheduler = NoiseScheduler(
+    ddpm_schedule_config = DDPMScheduleConfig(
         num_timesteps=experiment_config.num_timesteps,
         beta_schedule=experiment_config.beta_schedule,
-        device=device,
+        device=device
     )
+    noise_scheduler = RawNoiseScheduler.from_ddpm_schedule_config(ddpm_schedule_config)
 
     optimizer = torch.optim.AdamW(
         model.parameters(),

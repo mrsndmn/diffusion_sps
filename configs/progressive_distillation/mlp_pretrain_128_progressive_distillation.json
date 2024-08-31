@@ -13,11 +13,12 @@
     "hidden_size": 128,
     "time_embedding": "sinusoidal",
     "input_embedding": "sinusoidal",
-    "save_images_step": 10,
+    "save_images_step": 25,
     "device": "cpu",
     "sps_checkpoint": null,
 
     "distillation_steps": 1,
     "distillation_factor": 2,
-    "teacher_checkpoint": "exps/mlp/model.pth"
+    "teacher_checkpoint": "exps/mlp/model.pth",
+    "student_scheduler_beta_correction": false
 }

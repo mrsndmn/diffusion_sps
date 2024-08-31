@@ -1,3 +1,4 @@
+from typing_extensions import Self
 import torch
 from torch.nn import functional as F
 
@@ -89,6 +90,9 @@ class DDPMScheduleConfig():
         ):
 
         self.num_timesteps = num_timesteps
+        self.beta_start = beta_start
+        self.beta_end = beta_end
+        self.beta_schedule = beta_schedule
 
         if beta_schedule == "linear":
             self.betas = torch.linspace(
@@ -159,7 +163,7 @@ class RawNoiseScheduler():
     def validate_schedule_params(self, **kwargs):
         for k, v in kwargs.items():
             assert v.dim() == 2, f"{k}.dim != 2"
-            assert v.shape[1] == 1, f"{k}.shape[1] == 1"
+            assert v.shape == torch.Size([self.num_timesteps, 1]), f"{k}.shape[1] == 1"
 
     def get_variance(self, t):
 
@@ -201,7 +205,6 @@ class RawNoiseScheduler():
         return torch.tensor(list(range(self.num_timesteps))[::-step], dtype=torch.long)
 
     def progressive_distillation_teacher_total_noise(self, teacher_noise_pred1, teacher_noise_pred2, timesteps, timesteps_next, student_noise_scale):
-
         noise_mult_t = self.noise_multiplicator_k[timesteps]
         noise_mult_t_next = (self.noise_multiplicator_k[timesteps_next] * self.alphas_sqrt[timesteps])
         teacher_noise_total = (teacher_noise_pred1 * noise_mult_t + teacher_noise_pred2 * noise_mult_t_next) / student_noise_scale
@@ -215,7 +218,7 @@ class RawNoiseScheduler():
     def from_ddpm_schedule_config(
             klass,
             schedule_config: DDPMScheduleConfig,
-        ):
+        ) -> Self:
 
         # used for progressive distillation
         noise_multiplicator_k = schedule_config.betas / schedule_config.sqrt_one_minus_alphas_cumprod
@@ -240,6 +243,33 @@ class RawNoiseScheduler():
             device=schedule_config.device
         )
 
+
+# class StudentNoiseScheduler(RawNoiseScheduler):
+
+#     @classmethod
+#     def from_teacher_noise_scheduler(klass, teacher_noise_scheduler: RawNoiseScheduler) -> Self:
+
+#         student_num_timesteps = teacher_noise_scheduler.num_timesteps // 2
+
+#         alphas_sqrt = teacher_noise_scheduler.alphas_sqrt[::2] * teacher_noise_scheduler.alphas_sqrt[1::2]
+#         variances = teacher_noise_scheduler.variances[::2] / teacher_noise_scheduler.alphas_sqrt[1::2] + teacher_noise_scheduler.variances[1::2]
+
+#         # TODO copypaste from ddpm scheduler config
+#         step_scaler = 1 / alphas_sqrt
+
+#         noise_multiplicator_k
+
+#         return klass(
+#             num_timesteps=student_num_timesteps,
+#             alphas_sqrt=alphas_sqrt.unsqueeze(1),
+#             variances=variances.unsqueeze(1),
+#             noise_multiplicator_k=noise_multiplicator_k.unsqueeze(1),
+#             step_scaler=step_scaler.unsqueeze(1),
+#             step_model_output_scaler=step_model_output_scaler.unsqueeze(1),
+#             add_noise_noise_scaler=add_noise_noise_scaler.unsqueeze(1),
+#             add_noise_x_scaler=add_noise_x_scaler.unsqueeze(1),
+#             device=schedule_config.device
+#         )
 
 
 class PDStudentNoiseScheduler():

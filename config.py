@@ -103,6 +103,8 @@ class ProgressiveDistillationExperimentConfig(ExperimentConfig):
     distillation_factor: int # во сколько раз будет уменьшаться количество таймстемпов?
     teacher_checkpoint: str
 
+    student_scheduler_beta_correction: bool
+
     @model_validator(mode='after')
     def runtime_after_validate_progressive_distillation(self: Self) -> Self:
         max_divider: int = 2**self.distillation_steps

@@ -102,7 +102,11 @@ if __name__ == "__main__":
 
     experiment_config = ProgressiveDistillationExperimentConfig.model_validate_json(config_json_data)
 
-    run = wandb.init(project="diffusion_sps_pd", notes=f"From config {arguments.config}", config=experiment_config.model_dump())
+    run = wandb.init(
+        project="diffusion_sps",
+        notes=f"{experiment_config.experiment_name}. From config {arguments.config}",
+        config=experiment_config.model_dump()
+    )
 
     dataset = datasets.get_dataset(experiment_config.dataset, n=100000)
     dataset_frame_numpy: np.ndarray = np.vstack([ t.numpy() for t in dataset.tensors ])
@@ -146,9 +150,12 @@ if __name__ == "__main__":
         teacher_noise_scheduler = RawNoiseScheduler.from_ddpm_schedule_config(ddpm_schedule_config)
 
         # todo взять формулы для шедулера из формулы!
+        # todo прямо сейчас это шедулер с увеличивающейся дисперсией
+        student_bera_scale = 2 if experiment_config.student_scheduler_beta_correction else 1
         student_ddpm_schedule_config = DDPMScheduleConfig(
             num_timesteps=int(current_num_timesteps / distillation_factor),
             beta_schedule=experiment_config.beta_schedule,
+            beta_end=ddpm_schedule_config.beta_end * student_bera_scale,
             device=device
         )
         student_noise_scheduler = RawNoiseScheduler.from_ddpm_schedule_config(student_ddpm_schedule_config)
