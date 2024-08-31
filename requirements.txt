@@ -1,3 +1,6 @@
 pydantic
 dvc
 wandb
+pandas
+matplotlib
+scikit-learn
