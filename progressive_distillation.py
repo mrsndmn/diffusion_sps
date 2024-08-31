@@ -80,13 +80,12 @@ class ProgressiveDistillationTraining(DiffusionTraining):
         student_noise_pred = student_model(noisy, student_timesteps)
 
         # самодельный вывел из формул
-        noise_mult_t = teacher_noise_scheduler.noise_multiplicator_k[timesteps]
-        noise_mult_t_next = (teacher_noise_scheduler.noise_multiplicator_k[timesteps_next] * teacher_noise_scheduler.alphas_sqrt[timesteps])
-        student_noise_mult = student_noise_scheduler.noise_multiplicator_k[student_timesteps].unsqueeze(1)
-
-        teacher_noise_total = (
-                teacher_noise_pred1 * noise_mult_t + teacher_noise_pred2 * noise_mult_t_next
-            ) / student_noise_mult
+        student_noise_scale = student_noise_scheduler.progressive_distillation_student_scale(student_timesteps)
+        teacher_noise_total = teacher_noise_scheduler.progressive_distillation_teacher_total_noise(
+            teacher_noise_pred1, teacher_noise_pred2,
+            timesteps, timesteps_next,
+            student_noise_scale
+        )
 
         assert student_noise_pred.shape == teacher_noise_total.shape, f"{student_noise_pred.shape} != {teacher_noise_total.shape}"
         loss = F.mse_loss(student_noise_pred, teacher_noise_total)
@@ -147,11 +146,12 @@ if __name__ == "__main__":
         teacher_noise_scheduler = RawNoiseScheduler.from_ddpm_schedule_config(ddpm_schedule_config)
 
         # todo взять формулы для шедулера из формулы!
-        student_noise_scheduler = NoiseScheduler(
+        student_ddpm_schedule_config = DDPMScheduleConfig(
             num_timesteps=int(current_num_timesteps / distillation_factor),
             beta_schedule=experiment_config.beta_schedule,
-            device=device,
+            device=device
         )
+        student_noise_scheduler = RawNoiseScheduler.from_ddpm_schedule_config(student_ddpm_schedule_config)
 
         optimizer = torch.optim.AdamW(
             student_model.parameters(),

@@ -200,6 +200,17 @@ class RawNoiseScheduler():
     def prepare_timesteps_for_sampling(self, step=1):
         return torch.tensor(list(range(self.num_timesteps))[::-step], dtype=torch.long)
 
+    def progressive_distillation_teacher_total_noise(self, teacher_noise_pred1, teacher_noise_pred2, timesteps, timesteps_next, student_noise_scale):
+
+        noise_mult_t = self.noise_multiplicator_k[timesteps]
+        noise_mult_t_next = (self.noise_multiplicator_k[timesteps_next] * self.alphas_sqrt[timesteps])
+        teacher_noise_total = (teacher_noise_pred1 * noise_mult_t + teacher_noise_pred2 * noise_mult_t_next) / student_noise_scale
+
+        return teacher_noise_total
+
+    def progressive_distillation_student_scale(self, timesteps):
+        return self.noise_multiplicator_k[timesteps]
+
     @classmethod
     def from_ddpm_schedule_config(
             klass,
