@@ -2,7 +2,6 @@ import argparse
 import os
 from typing import Dict, List
 import random
-from dataclasses import asdict
 
 import wandb
 
@@ -23,8 +22,8 @@ from pydantic_core import from_json
 
 # local imports
 import datasets
-from training import GracefulKiller
-from noise_scheduler import NoiseScheduler
+from training import GracefulKiller, DiffusionTraining
+from noise_scheduler import NoiseScheduler, RawNoiseScheduler, DDPMScheduleConfig
 from config import ProgressiveDistillationExperimentConfig, DeviceEnum, ModelTypeEnum
 from model import get_model, MLP, MLPSPS, AnyModel
 from metric import metric_nearest_distance
@@ -32,7 +31,7 @@ from metric import metric_nearest_distance
 from ddpm import eval_iteration
 
 
-class ProgressiveDistillationTraining():
+class ProgressiveDistillationTraining(DiffusionTraining):
 
     def __init__(self, experiment_config: ProgressiveDistillationExperimentConfig):
 
@@ -57,6 +56,42 @@ class ProgressiveDistillationTraining():
 
         return timesteps, timesteps_next, student_timesteps
 
+    def training_step(
+            self,
+            teacher_model: AnyModel,
+            teacher_noise_scheduler: RawNoiseScheduler,
+            student_model: AnyModel,
+            student_noise_scheduler: RawNoiseScheduler,
+            ):
+
+        timesteps, timesteps_next, student_timesteps = self.prepare_timesteps()
+
+        # todo как-то мы будем использовать этот шум?
+        noise = torch.randn(batch.shape, device=device)
+        noisy = teacher_noise_scheduler.add_noise(batch, noise, timesteps)
+
+        # 2 step of teacher model
+        with torch.no_grad():
+            teacher_noise_pred1 = teacher_model(noisy, timesteps)
+            teacher_sample1 = teacher_noise_scheduler.step(teacher_noise_pred1, timesteps, noisy)
+
+            teacher_noise_pred2 = teacher_model(teacher_sample1, timesteps_next)
+
+        student_noise_pred = student_model(noisy, student_timesteps)
+
+        # самодельный вывел из формул
+        noise_mult_t = teacher_noise_scheduler.noise_multiplicator_k[timesteps]
+        noise_mult_t_next = (teacher_noise_scheduler.noise_multiplicator_k[timesteps_next] * teacher_noise_scheduler.alphas_sqrt[timesteps])
+        student_noise_mult = student_noise_scheduler.noise_multiplicator_k[student_timesteps].unsqueeze(1)
+
+        teacher_noise_total = (
+                teacher_noise_pred1 * noise_mult_t + teacher_noise_pred2 * noise_mult_t_next
+            ) / student_noise_mult
+
+        assert student_noise_pred.shape == teacher_noise_total.shape, f"{student_noise_pred.shape} != {teacher_noise_total.shape}"
+        loss = F.mse_loss(student_noise_pred, teacher_noise_total)
+
+        return loss
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -68,7 +103,7 @@ if __name__ == "__main__":
 
     experiment_config = ProgressiveDistillationExperimentConfig.model_validate_json(config_json_data)
 
-    run = wandb.init(project="diffusion_sps_pd", notes=f"From config {arguments.config}", config=asdict(experiment_config))
+    run = wandb.init(project="diffusion_sps_pd", notes=f"From config {arguments.config}", config=experiment_config.model_dump())
 
     dataset = datasets.get_dataset(experiment_config.dataset, n=100000)
     dataset_frame_numpy: np.ndarray = np.vstack([ t.numpy() for t in dataset.tensors ])
@@ -103,11 +138,13 @@ if __name__ == "__main__":
         # todo change model timesteps count
         current_num_timesteps = int(experiment_config.num_timesteps / student_timesteps_scale)
         print("current_num_timesteps", current_num_timesteps)
-        teacher_noise_scheduler = NoiseScheduler(
-            num_timesteps=current_num_timesteps,
+
+        ddpm_schedule_config = DDPMScheduleConfig(
+            num_timesteps=experiment_config.num_timesteps,
             beta_schedule=experiment_config.beta_schedule,
-            device=device,
+            device=device
         )
+        teacher_noise_scheduler = RawNoiseScheduler.from_ddpm_schedule_config(ddpm_schedule_config)
 
         # todo взять формулы для шедулера из формулы!
         student_noise_scheduler = NoiseScheduler(
@@ -143,32 +180,13 @@ if __name__ == "__main__":
 
                 batch = batch[0].to(device)
 
-                timesteps, timesteps_next, student_timesteps = pd_training.prepare_timesteps()
+                loss = pd_training.training_step(
+                    teacher_model,
+                    teacher_noise_scheduler,
+                    student_model,
+                    student_noise_scheduler,
+                )
 
-                # todo как-то мы будем использовать этот шум?
-                noise = torch.randn(batch.shape, device=device)
-                noisy = teacher_noise_scheduler.add_noise(batch, noise, timesteps)
-
-                # 2 step of teacher model
-                with torch.no_grad():
-                    teacher_noise_pred1 = teacher_model(noisy, timesteps)
-                    teacher_sample1 = teacher_noise_scheduler.step(teacher_noise_pred1, timesteps, noisy)
-
-                    teacher_noise_pred2 = teacher_model(teacher_sample1, timesteps_next)
-                    teacher_sample2 = teacher_noise_scheduler.step(teacher_noise_pred2, timesteps_next, teacher_sample1)
-
-                student_noise_pred = student_model(noisy, student_timesteps)
-
-                # самодельный вывел из формул
-                noise_mult_t = teacher_noise_scheduler.noise_multiplicator_k[timesteps].unsqueeze(1)
-                noise_mult_t_next = (teacher_noise_scheduler.noise_multiplicator_k[timesteps_next] * teacher_noise_scheduler.alphas_sqrt[timesteps]).unsqueeze(1)
-                student_noise_mult = student_noise_scheduler.noise_multiplicator_k[student_timesteps].unsqueeze(1)
-
-                teacher_noise_total = (
-                        teacher_noise_pred1 * noise_mult_t + teacher_noise_pred2 * noise_mult_t_next
-                    ) / student_noise_mult
-
-                loss = F.mse_loss(student_noise_pred, teacher_noise_total)
                 assert loss.item() < 10
 
                 loss.backward(loss)
@@ -195,8 +213,10 @@ if __name__ == "__main__":
                     frame = eval_iteration(experiment_config, student_model, student_noise_scheduler,  device=device, epoch=epoch, prefix=f'student_{student_num_timesteps}_')
 
                     metrics_value = metric_nearest_distance(frame, dataset_frame_numpy)
+                    print("metrics_value", metrics_value)
+
                     validation_logs = {
-                        ("validation/"+ k): v for k, v in asdict(metrics_value).items()
+                        ("validation/"+ k): v for k, v in metrics_value.model_dump().items()
                     }
 
                     frame_table = wandb.Table(data=frame, columns=["x", "y"])

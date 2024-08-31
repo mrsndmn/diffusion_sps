@@ -12,3 +12,7 @@ class GracefulKiller:
 class DiffusionTraining:
     def prepare_timesteps(self):
         raise NotImplemented
+
+    def training_step(self, *args, **kwargs):
+        raise NotImplemented
+

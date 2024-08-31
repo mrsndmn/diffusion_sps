@@ -42,7 +42,6 @@ class TimeEmbeddingEnum(str, Enum):
     identity   = "identity"
 
 
-@dataclass
 class ExperimentConfig(BaseModel):
     experiment_name: str
     dataset: DatasetEnum
@@ -98,6 +97,7 @@ class ExperimentConfig(BaseModel):
 
         return self
 
+@dataclass
 class ProgressiveDistillationExperimentConfig(ExperimentConfig):
     distillation_steps: int # сколько раз будет уменьшаться количество таймстепов?
     distillation_factor: int # во сколько раз будет уменьшаться количество таймстемпов?

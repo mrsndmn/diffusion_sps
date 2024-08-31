@@ -1,9 +1,7 @@
 import numpy as np
 
-from dataclasses import dataclass
-
-@dataclass
-class MetricsNearestDisatnceResult:
+from pydantic import BaseModel
+class MetricsNearestDisatnceResult(BaseModel):
     value_mean: float
     value_max: float
     value_sum: float

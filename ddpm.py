@@ -5,8 +5,6 @@ from typing import Dict, List
 import random
 import pandas as pd
 
-from dataclasses import asdict
-
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -103,7 +101,7 @@ if __name__ == "__main__":
 
     experiment_config = ExperimentConfig.model_validate_json(config_json_data)
 
-    run = wandb.init(project="diffusion_sps", notes=f"From config {arguments.config}", config=asdict(experiment_config))
+    run = wandb.init(project="diffusion_sps", notes=f"From config {arguments.config}", config=experiment_config.model_dump())
 
     dataset = datasets.get_dataset(experiment_config.dataset)
     dataset_frame_numpy: np.ndarray = np.vstack([ t.numpy() for t in dataset.tensors ])
@@ -160,7 +158,7 @@ if __name__ == "__main__":
 
                 metrics_value = metric_nearest_distance(frame, dataset_frame_numpy)
                 validation_logs = {
-                    ("validation/"+ k): v for k, v in asdict(metrics_value).items()
+                    ("validation/"+ k): v for k, v in metrics_value.model_dump().items()
                 }
 
                 frame_table = wandb.Table(data=frame, columns=["x", "y"])
