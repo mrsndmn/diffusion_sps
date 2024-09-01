@@ -26,31 +26,26 @@ stages:
     - configs/progressive_distillation/mlp_pretrain_128.json # todo move to param
     outs:
     - exps/mlp_pretrain_128/model.pth
-  pd_simple:
-    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/progressive_distillation.json
+
+  pd_no_beta_correction:
+    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/no_beta_correction.json
     deps:
     - static
-    - configs/progressive_distillation/progressive_distillation.json # todo move to param
-    - exps/mlp_pretrain_128/model.pth
-  pd_simple_beta_correction:
-    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/progressive_distillation_beta_correction.json
-    deps:
-    - static
-    - configs/progressive_distillation/progressive_distillation_beta_correction.json # todo move to param
+    - configs/progressive_distillation/no_beta_correction.json # todo move to param
     - exps/mlp_pretrain_128/model.pth
 
   pd_multistage:
-    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/progressive_distillation_multistage.json
+    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/multistage.json
     deps:
     - progressive_distillation.py
     - static
-    - configs/progressive_distillation/progressive_distillation_multistage.json # todo move to param
+    - configs/progressive_distillation/multistage.json # todo move to param
     - exps/mlp_pretrain_128/model.pth
 
   pd_multistage_sps:
-    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/progressive_distillation_multistage_sps.json
+    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/multistage_sps.json
     deps:
     - progressive_distillation.py
     - static
-    - configs/progressive_distillation/progressive_distillation_multistage_sps.json # todo move to param
+    - configs/progressive_distillation/multistage_sps.json # todo move to param
     - exps/mlp_pretrain_128/model.pth

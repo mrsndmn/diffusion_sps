@@ -74,9 +74,9 @@ stages:
       size: 64046
       nfiles: 1
   pd_simple_beta_correction:
-    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/progressive_distillation_beta_correction.json
+    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/no_beta_correction.json
     deps:
-    - path: configs/progressive_distillation/progressive_distillation_beta_correction.json
+    - path: configs/progressive_distillation/no_beta_correction.json
       hash: md5
       md5: 4431b9454081ce211fbff9f9bddccb52
       size: 697
@@ -90,9 +90,9 @@ stages:
       size: 64046
       nfiles: 1
   pd_multistage:
-    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/progressive_distillation_multistage.json
+    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/multistage.json
     deps:
-    - path: configs/progressive_distillation/progressive_distillation_multistage.json
+    - path: configs/progressive_distillation/multistage.json
       hash: md5
       md5: d61758a365f9512130aeebdffe317227
       size: 644
@@ -110,9 +110,9 @@ stages:
       size: 64046
       nfiles: 1
   pd_multistage_sps:
-    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/progressive_distillation_multistage_sps.json
+    cmd: PYTHONPATH=. python progressive_distillation.py --config configs/progressive_distillation/multistage_sps.json
     deps:
-    - path: configs/progressive_distillation/progressive_distillation_multistage_sps.json
+    - path: configs/progressive_distillation/multistage_sps.json
       hash: md5
       md5: 530af84dda9318ba02e353e27512a247
       size: 652
