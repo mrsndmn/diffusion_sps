@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from positional_embeddings import PositionalEmbedding
 
-from config import ExperimentConfig
+from config import BaseExperiment
 
 
 class Block(nn.Module):
@@ -89,7 +89,7 @@ class MLPSPS(nn.Module):
 
 AnyModel = Union[MLP, MLPSPS]
 
-def get_model(config: ExperimentConfig, ):
+def get_model(config: BaseExperiment):
 
     model: Union[MLP | MLPSPS]
 

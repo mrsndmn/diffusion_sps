@@ -21,7 +21,7 @@ from torch.profiler import profile, record_function, ProfilerActivity
 from pydantic_core import from_json
 
 # local imports
-from training import GracefulKiller
+from src.training import GracefulKiller
 from noise_scheduler import RawNoiseScheduler, DDPMScheduleConfig
 from config import ExperimentConfig, DeviceEnum, ModelTypeEnum
 from model import get_model, MLP, MLPSPS, AnyModel

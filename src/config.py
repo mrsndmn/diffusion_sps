@@ -42,12 +42,26 @@ class TimeEmbeddingEnum(str, Enum):
     identity   = "identity"
 
 
-class ExperimentConfig(BaseModel):
+class BaseExperiment(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     experiment_name: str
     dataset: DatasetEnum
+    device: DeviceEnum
+
     nn_model_type: ModelTypeEnum
+
+    sps_checkpoint: Optional[str]
+    hidden_layers: int
+    embedding_size: int
+    num_timesteps: int
+    hidden_size: int
+    beta_schedule: BetaScheduleEnum
+    time_embedding: TimeEmbeddingEnum
+    input_embedding: InputEmbeddingEnum
+
+
+class ExperimentConfig(BaseExperiment):
 
     # training params
     num_epochs: int
@@ -57,17 +71,6 @@ class ExperimentConfig(BaseModel):
 
     # evaluate params
     save_images_step: int
-
-    sps_checkpoint: Optional[str]
-
-    hidden_layers: int
-    embedding_size: int
-    num_timesteps: int
-    hidden_size: int
-    beta_schedule: BetaScheduleEnum
-    time_embedding: TimeEmbeddingEnum
-    input_embedding: InputEmbeddingEnum
-    device: DeviceEnum
 
     @computed_field
     def outdir(self) -> str:
@@ -99,7 +102,6 @@ class ExperimentConfig(BaseModel):
 
         return self
 
-@dataclass
 class ProgressiveDistillationExperimentConfig(ExperimentConfig):
 
     distillation_steps: int # сколько раз будет уменьшаться количество таймстепов?
@@ -118,3 +120,8 @@ class ProgressiveDistillationExperimentConfig(ExperimentConfig):
 
         return self
 
+
+class DDIMEvaluationConfig(BaseExperiment):
+
+    timesteps_reductions_count: int
+    checkpoint: str

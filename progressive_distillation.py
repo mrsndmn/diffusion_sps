@@ -22,7 +22,7 @@ from pydantic_core import from_json
 
 # local imports
 import datasets
-from training import GracefulKiller, DiffusionTraining
+from src.training import GracefulKiller, DiffusionTraining
 from noise_scheduler import NoiseScheduler, RawNoiseScheduler, DDPMScheduleConfig
 from config import ProgressiveDistillationExperimentConfig, DeviceEnum, ModelTypeEnum
 from model import get_model, MLP, MLPSPS, AnyModel
@@ -237,11 +237,10 @@ if __name__ == "__main__":
                         raise Exception("too bad metrics")
             # Epochs end
 
+        print("Saving model...")
+        os.makedirs(experiment_config.outdir, exist_ok=True) # type: ignore
+        torch.save(student_model.state_dict(), f"{experiment_config.outdir}/model_{student_noise_scheduler.num_timesteps}.pth")
+
         # Next distillation step
         teacher_model = student_model
         teacher_noise_scheduler = student_noise_scheduler
-
-
-    print("Saving model...")
-    os.makedirs(experiment_config.outdir, exist_ok=True) # type: ignore
-    torch.save(student_model.state_dict(), f"{experiment_config.outdir}/model.pth")
