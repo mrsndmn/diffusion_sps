@@ -1,19 +1,22 @@
 {
-    "experiment_name":"ddim.evaluation",
-    "dataset": "dino",
-    "device": "cpu",
 
     "nn_model_type": "mlp",
-    "sps_checkpoint": null,
-
     "hidden_layers": 1,
     "embedding_size": 64,
     "hidden_size": 128,
     "num_timesteps": 128,
+
+    "sps_checkpoint": "exps/progressive_distillation.multistage/model_64.pth",
+    "dataset": "dino",
+
+    "experiment_name": "ddim.sample",
+
     "beta_schedule": "linear",
     "time_embedding": "sinusoidal",
     "input_embedding": "sinusoidal",
+    "device": "cpu",
 
-    "timesteps_reductions_count": 5,
-    "checkpoint": "exps/mlp_pretrain_128/model.pth"
+    "checkpoint": "exps/mlp_pretrain_128/model.pth",
+    "ddim_steps": 16,
+    "ddim_eta": 0.0
 }

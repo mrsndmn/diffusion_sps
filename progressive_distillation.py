@@ -23,7 +23,7 @@ from pydantic_core import from_json
 # local imports
 import datasets
 from src.training import GracefulKiller, DiffusionTraining
-from noise_scheduler import NoiseScheduler, RawNoiseScheduler, DDPMScheduleConfig
+from noise_scheduler import RawNoiseScheduler, DDPMScheduleConfig
 from config import ProgressiveDistillationExperimentConfig, DeviceEnum, ModelTypeEnum
 from model import get_model, MLP, MLPSPS, AnyModel
 from metric import metric_nearest_distance

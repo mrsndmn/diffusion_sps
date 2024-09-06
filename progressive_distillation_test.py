@@ -10,7 +10,7 @@ import numpy as np
 from config import ProgressiveDistillationExperimentConfig, DeviceEnum, ModelTypeEnum
 from model import get_model, MLP, MLPSPS, AnyModel
 import datasets
-from noise_scheduler import NoiseScheduler
+from noise_scheduler import RawNoiseScheduler, DDPMScheduleConfig
 
 def test_pd():
 
@@ -29,11 +29,13 @@ def test_pd():
     teacher_model = get_model(experiment_config)
     teacher_model = teacher_model.to(device)
 
-    teacher_noise_scheduler = NoiseScheduler(
+    ddpm_config = DDPMScheduleConfig(
         num_timesteps=experiment_config.num_timesteps,
         beta_schedule=experiment_config.beta_schedule,
         device=device,
     )
+
+    teacher_noise_scheduler = RawNoiseScheduler(ddpm_config)
 
     student_model = get_model(experiment_config)
     student_model.load_state_dict(teacher_model.state_dict())

@@ -47,7 +47,6 @@ class BaseExperiment(BaseModel):
 
     experiment_name: str
     dataset: DatasetEnum
-    device: DeviceEnum
 
     nn_model_type: ModelTypeEnum
 
@@ -59,6 +58,21 @@ class BaseExperiment(BaseModel):
     beta_schedule: BetaScheduleEnum
     time_embedding: TimeEmbeddingEnum
     input_embedding: InputEmbeddingEnum
+
+    device: DeviceEnum
+
+    @computed_field
+    def nn_device(self) -> DeviceEnum:
+        if self.device == 'auto':
+            device = DeviceEnum.cpu
+            if torch.backends.mps.is_available():
+                device = DeviceEnum.mps
+            elif torch.cuda.is_available():
+                device = DeviceEnum.cuda
+        else:
+            device = self.device
+
+        return device
 
 
 class ExperimentConfig(BaseExperiment):
@@ -79,19 +93,6 @@ class ExperimentConfig(BaseExperiment):
     @computed_field
     def imgdir(self) -> str:
         return os.path.join(self.outdir, "images") # type: ignore
-
-    @computed_field
-    def nn_device(self) -> DeviceEnum:
-        if self.device == 'auto':
-            device = DeviceEnum.cpu
-            if torch.backends.mps.is_available():
-                device = DeviceEnum.mps
-            elif torch.cuda.is_available():
-                device = DeviceEnum.cuda
-        else:
-            device = self.device
-
-        return device
 
 
     @model_validator(mode='after')
@@ -122,6 +123,6 @@ class ProgressiveDistillationExperimentConfig(ExperimentConfig):
 
 
 class DDIMEvaluationConfig(BaseExperiment):
-
-    timesteps_reductions_count: int
     checkpoint: str
+    ddim_steps: int
+    ddim_eta: float
