@@ -9,8 +9,8 @@
     "dataset": "dino",
     "train_batch_size": 200,
     "eval_batch_size": 1000,
-    "num_epochs": 9,
-    "save_images_step": 3,
+    "num_epochs": 200,
+    "save_images_step": 25,
 
     "learning_rate": 0.001,
     "beta_schedule": "linear",

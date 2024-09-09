@@ -57,6 +57,20 @@ def train_iteration(experiment_config: ExperimentConfig, model: AnyModel, optimi
     return loss
 
 
+def plot_scatter(image_path, sample_npy, prefix="", epoch=0):
+    xmin, xmax = -6, 6
+    ymin, ymax = -6, 6
+
+    plt.figure(figsize=(10, 10))
+    plt.scatter(sample_npy[:, 0], sample_npy[:, 1], alpha=0.5)
+    plt.xlim(xmin, xmax)
+    plt.ylim(ymin, ymax)
+
+    plt.savefig(image_path)
+    plt.title(f"{prefix}Epoch {epoch}")
+    plt.close()
+
+
 def eval_iteration(experiment_config: ExperimentConfig, model: AnyModel, noise_scheduler: RawNoiseScheduler, device: DeviceEnum, scheduler_step=1, epoch=0, prefix=''):
 
     model.eval()
@@ -72,19 +86,9 @@ def eval_iteration(experiment_config: ExperimentConfig, model: AnyModel, noise_s
 
     imgdir: str = experiment_config.imgdir # type: ignore
     os.makedirs(imgdir, exist_ok=True)
-
-    xmin, xmax = -6, 6
-    ymin, ymax = -6, 6
-
-    plt.figure(figsize=(10, 10))
-    plt.scatter(sample_npy[:, 0], sample_npy[:, 1], alpha=0.5)
-    plt.xlim(xmin, xmax)
-    plt.ylim(ymin, ymax)
-
     image_path = f"{imgdir}/{prefix}{epoch}.png"
-    plt.savefig(image_path)
-    plt.title(f"{prefix}Epoch {epoch}")
-    plt.close()
+
+    plot_scatter(image_path, sample_npy, prefix=prefix, epoch=epoch)
 
     return sample_npy
 
@@ -110,6 +114,13 @@ if __name__ == "__main__":
 
     dataset = datasets.get_dataset(experiment_config.dataset)
     dataset_frame_numpy: np.ndarray = np.vstack([ t.numpy() for t in dataset.tensors ])
+
+    imgdir: str = experiment_config.imgdir # type: ignore
+    os.makedirs(imgdir, exist_ok=True)
+
+    image_path = f"{imgdir}/target_dino.png"
+    plot_scatter(image_path, dataset_frame_numpy[:1000], prefix="target")
+
     dataloader = DataLoader(
         dataset, batch_size=experiment_config.train_batch_size, shuffle=True, drop_last=True
     )
@@ -162,7 +173,7 @@ if __name__ == "__main__":
                 # generate data with the model to later visualize the learning process
                 frame = eval_iteration(experiment_config, model, noise_scheduler, device=device, epoch=epoch)
 
-                metrics_value = metric_nearest_distance(frame, dataset_frame_numpy)
+                metrics_value = metric_nearest_distance(frame, dataset_frame_numpy[:frame.shape[0]])
                 validation_logs = {
                     ("validation/"+ k): v for k, v in metrics_value.model_dump().items()
                 }

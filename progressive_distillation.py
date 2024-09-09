@@ -111,6 +111,7 @@ if __name__ == "__main__":
 
     dataset = datasets.get_dataset(experiment_config.dataset, n=100000)
     dataset_frame_numpy: np.ndarray = np.vstack([ t.numpy() for t in dataset.tensors ])
+    dataset_frame_numpy = dataset_frame_numpy[:1000]
     dataloader = DataLoader(
         dataset, batch_size=experiment_config.train_batch_size, shuffle=True, drop_last=True
     )
